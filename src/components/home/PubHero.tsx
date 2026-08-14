@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 type Pub = {
   id: string;
   auteur_type?: string;
+  boutique_id?: string | null;
   titre: string;
   sous_titre: string | null;
   media_url: string | null;
@@ -33,7 +34,7 @@ export default function PubHero() {
     (async () => {
       const { data, error } = await supabase
         .from("publications")
-        .select("id, auteur_type, titre, sous_titre, media_url, media_type, lien_url, ordre")
+        .select("id, auteur_type, boutique_id, titre, sous_titre, media_url, media_type, lien_url, ordre")
         .eq("actif", true)
         .order("ordre", { ascending: true });
 
@@ -43,7 +44,35 @@ export default function PubHero() {
         return;
       }
 
-      setPubs((data as Pub[]) || []);
+      const rows = (data as Pub[]) || [];
+
+      // Les pubs SDS passent toujours ; les pubs boutique seulement si la
+      // boutique est SDS Verified au moment de l'affichage.
+      const boutiqueIds = [
+        ...new Set(
+          rows
+            .filter((r) => r.auteur_type === "boutique" && r.boutique_id)
+            .map((r) => r.boutique_id!)
+        ),
+      ];
+
+      let verifiedIds = new Set<string>();
+      if (boutiqueIds.length) {
+        const { data: bs } = await supabase
+          .from("boutiques")
+          .select("id")
+          .in("id", boutiqueIds)
+          .eq("sds_verified", true);
+        verifiedIds = new Set((bs || []).map((b: { id: string }) => b.id));
+      }
+
+      setPubs(
+        rows.filter(
+          (r) =>
+            r.auteur_type !== "boutique" ||
+            (r.boutique_id && verifiedIds.has(r.boutique_id))
+        )
+      );
     })();
   }, []);
 
@@ -55,11 +84,7 @@ export default function PubHero() {
 
   const list =
     pubs.length > 0
-      ? pubs.map((pub, idx) => ({
-          ...pub,
-          media_url: pub.media_url || FALLBACK_BACKGROUNDS[idx % FALLBACK_BACKGROUNDS.length],
-          media_type: pub.media_type || "image",
-        }))
+      ? pubs
       : [
           {
             id: "fallback",
@@ -73,8 +98,9 @@ export default function PubHero() {
         ];
 
   const p = list[i % list.length];
-  const bg = p.media_url || FALLBACK_BACKGROUNDS[i % FALLBACK_BACKGROUNDS.length];
-  const isVideo = p.media_type === "video" && !!p.media_url;
+  const rawMedia = (p.media_url || "").trim();
+  const bg = rawMedia || FALLBACK_BACKGROUNDS[i % FALLBACK_BACKGROUNDS.length];
+  const isVideo = p.media_type === "video" && !!rawMedia;
   const href = p.lien_url || "/catalogue";
 
   return (
@@ -108,13 +134,14 @@ export default function PubHero() {
         />
       ) : (
         <div
-          key={p.id + bg}
+          key={`${p.id}-${i}-${bg}`}
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage: `url(${bg})`,
+            backgroundImage: `url("${bg}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
+            backgroundColor: "#04101c",
           }}
         />
       )}

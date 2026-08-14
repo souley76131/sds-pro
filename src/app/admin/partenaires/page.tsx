@@ -19,6 +19,8 @@ type Boutique = {
   created_at?: string;
   commission?: number;
   hero_videos?: string[] | string | null;
+  sds_verified?: boolean;
+  sds_verified_demande?: boolean;
 };
 
 type Order = {
@@ -87,6 +89,19 @@ export default function AdminPartenairesPage() {
     showToast(
       statut === "valide" ? "✅ Boutique validée" : statut === "refuse" ? "❌ Boutique refusée" : "Statut mis à jour"
     );
+    load();
+  }
+
+  async function setVerified(id: string, value: boolean) {
+    const { error } = await supabase
+      .from("boutiques")
+      .update({ sds_verified: value, sds_verified_demande: false })
+      .eq("id", id);
+    if (error) {
+      showToast("Erreur : " + error.message);
+      return;
+    }
+    showToast(value ? "✓ SDS Verified accordé" : "SDS Verified retiré");
     load();
   }
 
@@ -254,7 +269,27 @@ export default function AdminPartenairesPage() {
               <span style={{ fontSize: 11, fontWeight: 700, color: st.color }}>{st.label}</span>
             </div>
 
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>{nom}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <div style={{ fontWeight: 700 }}>{nom}</div>
+              {b.sds_verified && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#00c8ff",
+                    background: "rgba(0,200,255,0.12)",
+                    border: "1px solid rgba(0,200,255,0.35)",
+                    borderRadius: 100,
+                    padding: "2px 8px",
+                  }}
+                >
+                  ✓ SDS Verified
+                </span>
+              )}
+              {b.sds_verified_demande && !b.sds_verified && (
+                <span style={{ fontSize: 11, color: "#ff9100" }}>Demande en attente</span>
+              )}
+            </div>
             <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📞 {tel}</div>
             {b.email && <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📧 {b.email}</div>}
             {(b.adresse || b.address) && (
@@ -271,6 +306,15 @@ export default function AdminPartenairesPage() {
               <Btn onClick={() => setStatut(b.id, "refuse")} color="#ff4444">
                 ❌ Refuser
               </Btn>
+              {b.sds_verified ? (
+                <Btn onClick={() => setVerified(b.id, false)} color="#ff9100">
+                  Retirer SDS Verified
+                </Btn>
+              ) : (
+                <Btn onClick={() => setVerified(b.id, true)} color="#00c8ff">
+                  ✓ Accorder SDS Verified
+                </Btn>
+              )}
               {tel !== "—" && (
                 <Btn
                   onClick={() =>

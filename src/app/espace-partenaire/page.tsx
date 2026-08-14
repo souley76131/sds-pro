@@ -7,10 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 type Boutique = {
   id: string;
   nom: string;
+  slug?: string;
   proprietaire?: string;
   ville?: string;
   logo_url?: string;
   hero_videos?: string[] | string | null;
+  sds_verified?: boolean;
+  sds_verified_demande?: boolean;
 };
 
 export default function EspacePartenairePage() {
@@ -28,6 +31,14 @@ export default function EspacePartenairePage() {
   const [heroVideos, setHeroVideos] = useState<string[]>([]);
   const [newVideoUrl, setNewVideoUrl] = useState("");
   const [videoMsg, setVideoMsg] = useState("");
+
+  const [pubTitre, setPubTitre] = useState("");
+  const [pubSous, setPubSous] = useState("");
+  const [pubMedia, setPubMedia] = useState("");
+  const [pubType, setPubType] = useState<"image" | "video">("image");
+  const [pubLien, setPubLien] = useState("");
+  const [pubMsg, setPubMsg] = useState("");
+  const [pubSaving, setPubSaving] = useState(false);
 
   const [nom, setNom] = useState("");
   const [prop, setProp] = useState("");
@@ -91,7 +102,7 @@ export default function EspacePartenairePage() {
     }
     const { data: rows } = await supabase
       .from("boutiques")
-      .select("id,nom,logo_url,proprietaire,ville,hero_videos")
+      .select("id,nom,slug,logo_url,proprietaire,ville,hero_videos,sds_verified,sds_verified_demande")
       .eq("id", bid)
       .limit(1);
     setBoutique((rows && rows[0]) || { id: bid, nom: "Ma boutique" });
@@ -261,6 +272,61 @@ export default function EspacePartenairePage() {
 
   async function removeVideo(index: number) {
     await saveVideos(heroVideos.filter((_, i) => i !== index));
+  }
+
+  async function demanderVerified() {
+    if (!boutique?.id) return;
+    setPubMsg("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("boutiques")
+      .update({
+        sds_verified_demande: true,
+        sds_verified_demande_at: new Date().toISOString(),
+      })
+      .eq("id", boutique.id);
+    if (error) {
+      setPubMsg("Erreur : " + error.message);
+      return;
+    }
+    setBoutique((b) => (b ? { ...b, sds_verified_demande: true } : b));
+    setPubMsg("✓ Demande envoyée. SDS PRO vous contactera.");
+  }
+
+  async function creerPubBoutique() {
+    if (!boutique?.id) return;
+    if (!boutique.sds_verified) {
+      setPubMsg("Passez par SDS Verified pour publier.");
+      return;
+    }
+    if (!pubTitre.trim() || !pubMedia.trim()) {
+      setPubMsg("Titre + URL image/vidéo obligatoires.");
+      return;
+    }
+    setPubSaving(true);
+    setPubMsg("");
+    const supabase = createClient();
+    const { error } = await supabase.from("publications").insert({
+      auteur_type: "boutique",
+      boutique_id: boutique.id,
+      titre: pubTitre.trim(),
+      sous_titre: pubSous.trim() || null,
+      media_url: pubMedia.trim(),
+      media_type: pubType,
+      lien_url: pubLien.trim() || `/boutique/${boutique.slug || boutique.id}`,
+      ordre: 50,
+      actif: true,
+    });
+    setPubSaving(false);
+    if (error) {
+      setPubMsg("Erreur : " + error.message);
+      return;
+    }
+    setPubMsg("✓ Publication envoyée sur le catalogue");
+    setPubTitre("");
+    setPubSous("");
+    setPubMedia("");
+    setPubLien("");
   }
 
   async function chargerResume() {
@@ -718,7 +784,24 @@ export default function EspacePartenairePage() {
       <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 22, borderBottom: "1px solid rgba(0,180,255,0.22)", marginBottom: 22 }}>
         <div style={{ width: 46, height: 46, borderRadius: 12, background: "rgba(0,200,255,0.1)", border: "1px solid rgba(0,180,255,0.22)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🏪</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 19, fontWeight: 700 }}>{boutique?.nom || "Ma boutique"}</div>
+          <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 19, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+            {boutique?.nom || "Ma boutique"}
+            {boutique?.sds_verified && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#00c8ff",
+                  background: "rgba(0,200,255,0.12)",
+                  border: "1px solid rgba(0,200,255,0.35)",
+                  borderRadius: 100,
+                  padding: "2px 8px",
+                }}
+              >
+                ✓ SDS Verified
+              </span>
+            )}
+          </div>
           <div style={{ color: "#7a9abb", fontSize: 12 }}>{[boutique?.proprietaire, boutique?.ville].filter(Boolean).join(" · ") || "Espace partenaire"}</div>
           <div style={{ color: "#eaf7ff", fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>
             SECK DIGITAL SERVICES PRO (SDS PRO) · Commerce général, accessoires téléphoniques, vente en ligne et dépannage.
@@ -1226,6 +1309,89 @@ export default function EspacePartenairePage() {
               </div>
               <div style={{ color: "#7a9abb", fontSize: 13 }}>Personnalisez le bandeau hero de votre boutique</div>
             </div>
+
+            {!boutique?.sds_verified ? (
+              <div style={{ padding: 16, borderRadius: 12, border: "1px solid rgba(255,145,0,0.35)", background: "rgba(255,145,0,0.06)" }}>
+                <p style={{ color: "#ff9100", marginTop: 0, fontSize: 13, lineHeight: 1.6 }}>
+                  Pour afficher le nom de votre boutique et vos images / vidéos sur le catalogue, passez par{" "}
+                  <strong>SDS Verified</strong>.
+                </p>
+                <button
+                  type="button"
+                  onClick={demanderVerified}
+                  disabled={boutique?.sds_verified_demande}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: boutique?.sds_verified_demande ? "rgba(255,145,0,0.25)" : "linear-gradient(135deg,#ff9100,#ffb020)",
+                    color: boutique?.sds_verified_demande ? "#ff9100" : "#1a0f00",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: boutique?.sds_verified_demande ? "default" : "pointer",
+                  }}
+                >
+                  {boutique?.sds_verified_demande ? "Demande envoyée" : "Demander SDS Verified"}
+                </button>
+                {pubMsg && <p style={{ marginTop: 10, fontSize: 12, color: "#9eb6d0" }}>{pubMsg}</p>}
+              </div>
+            ) : (
+              <div style={{ padding: 16, borderRadius: 12, border: "1px solid rgba(0,200,255,0.3)", background: "rgba(0,200,255,0.05)" }}>
+                <div style={{ color: "#00c8ff", fontWeight: 700, marginBottom: 12, fontSize: 14 }}>
+                  ✓ SDS Verified — publier sur le catalogue
+                </div>
+                <input
+                  placeholder="Titre"
+                  value={pubTitre}
+                  onChange={(e) => setPubTitre(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                />
+                <input
+                  placeholder="Sous-titre"
+                  value={pubSous}
+                  onChange={(e) => setPubSous(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                />
+                <input
+                  placeholder="URL image ou vidéo (la vôtre)"
+                  value={pubMedia}
+                  onChange={(e) => setPubMedia(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                />
+                <select
+                  value={pubType}
+                  onChange={(e) => setPubType(e.target.value as "image" | "video")}
+                  style={{ ...inputStyle, marginBottom: 10 }}
+                >
+                  <option value="image">Image</option>
+                  <option value="video">Vidéo</option>
+                </select>
+                <input
+                  placeholder="Lien (optionnel)"
+                  value={pubLien}
+                  onChange={(e) => setPubLien(e.target.value)}
+                  style={{ ...inputStyle, marginBottom: 12 }}
+                />
+                <button
+                  type="button"
+                  onClick={creerPubBoutique}
+                  disabled={pubSaving}
+                  style={{
+                    padding: "10px 18px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "linear-gradient(135deg,#0055ff,#00c8ff)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  {pubSaving ? "…" : "Publier"}
+                </button>
+                {pubMsg && <p style={{ marginTop: 10, fontSize: 12, color: "#9eb6d0" }}>{pubMsg}</p>}
+              </div>
+            )}
 
             <div style={{ marginTop: 24, padding: 16, border: "1px solid rgba(0,180,255,0.25)", borderRadius: 12 }}>
               <h3 style={{ marginTop: 0, color: "#00c8ff", fontSize: 15, fontWeight: 700 }}>📹 Vidéos du bandeau</h3>
