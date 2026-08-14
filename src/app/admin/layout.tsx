@@ -14,6 +14,7 @@ const TABS = [
   { href: "/admin/ordinateurs", label: "💻 Ordinateurs" },
   { href: "/admin/credit", label: "🤝 Crédit Halal" },
   { href: "/admin/partenaires", label: "🏪 Partenaires" },
+  { href: "/admin/publications", label: "📢 Publications" },
   { href: "/admin/messagerie", label: "💬 Messagerie" },
   { href: "/admin/urgence", label: "🔴 Urgence" },
 ];
