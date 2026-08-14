@@ -1230,7 +1230,7 @@ export default function EspacePartenairePage() {
             <div style={{ marginTop: 24, padding: 16, border: "1px solid rgba(0,180,255,0.25)", borderRadius: 12 }}>
               <h3 style={{ marginTop: 0, color: "#00c8ff", fontSize: 15, fontWeight: 700 }}>📹 Vidéos du bandeau</h3>
               <p style={{ fontSize: 13, color: "#9eb6d0", marginBottom: 14 }}>
-                URLs MP4 (Supabase Storage, Cloudflare, etc.). Chaque vidéo s'affiche 6 secondes. Max conseillé : 3.
+                URLs MP4 (Supabase Storage, Cloudflare, etc.). Chaque vidéo s&apos;affiche 6 secondes. Max conseillé : 3.
               </p>
 
               {heroVideos.length > 0 && (

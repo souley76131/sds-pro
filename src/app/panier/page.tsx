@@ -68,7 +68,7 @@ export default function PanierPage() {
   return (
     <main style={{ paddingTop: 90, paddingBottom: 100, minHeight: "100vh", maxWidth: 720, margin: "0 auto", paddingLeft: 16, paddingRight: 16 }}>
       <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, letterSpacing: 2, color: "#00c8ff", marginBottom: 8 }}>
-        // PANIER
+        {"// PANIER"}
       </div>
       <h1 style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 24 }}>
         Mon panier

@@ -280,7 +280,7 @@ export default function CheckoutPage() {
   return (
     <main style={{ paddingTop: 90, paddingBottom: 100, maxWidth: 560, margin: "0 auto", paddingLeft: 16, paddingRight: 16 }}>
       <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, letterSpacing: 2, color: "#00c8ff", marginBottom: 8 }}>
-        // CHECKOUT
+        {"// CHECKOUT"}
       </div>
       <h1 style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 20 }}>
         Finaliser la commande

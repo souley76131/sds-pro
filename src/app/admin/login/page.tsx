@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
             fontFamily: "DM Mono, monospace",
           }}
         >
-          // PANNEAU ADMINISTRATION
+          {"// PANNEAU ADMINISTRATION"}
         </div>
 
         <input

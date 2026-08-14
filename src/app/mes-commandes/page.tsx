@@ -132,7 +132,7 @@ export default function MesCommandesPage() {
       }}
     >
       <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, letterSpacing: 2, color: "#00c8ff", marginBottom: 8 }}>
-        // MES COMMANDES
+        {"// MES COMMANDES"}
       </div>
       <h1 style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 28, fontWeight: 700, marginBottom: 20 }}>
         Historique

@@ -611,10 +611,6 @@ function CatalogueHero({
   useEffect(() => {
     const videos = heroVideos && Array.isArray(heroVideos) ? heroVideos.filter(Boolean) : [];
 
-    if (typeof window !== "undefined") {
-      console.log("Hero videos loaded:", videos.length, videos);
-    }
-
     if (videos.length <= 1) return;
 
     const timer = setInterval(() => {
