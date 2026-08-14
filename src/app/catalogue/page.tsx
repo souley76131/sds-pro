@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import BuyFlow from "@/components/buy/BuyFlow";
 import ProductCard from "@/components/catalogue/ProductCard";
+import PubHero from "@/components/home/PubHero";
 import { createClient } from "@/lib/supabase/client";
 import { addToCart } from "@/lib/cart";
 
@@ -312,15 +313,7 @@ export default function CataloguePage() {
   return (
     <main style={{ paddingTop: 80, paddingBottom: 80, minHeight: "100vh" }}>
       <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 20px" }}>
-        <CatalogueHero 
-          boutiqueNom={boutiqueMeta?.nom} 
-          boutiqueLogo={boutiqueMeta?.logo}
-          telephone={boutiqueMeta?.telephone}
-          whatsapp={boutiqueMeta?.whatsapp}
-          productCount={boutiqueProductCount}
-          minPrice={boutiqueMinPrice}
-          heroVideos={boutiqueMeta?.heroVideos}
-        />
+        <PubHero />
 
         {(loading || message) && (
           <p style={{ color: "#7a9abb", marginBottom: 24, fontSize: 14 }}>
