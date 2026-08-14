@@ -71,6 +71,12 @@ export default function AdminProduitsPage() {
 
   useEffect(() => {
     load();
+    if (typeof window !== "undefined") {
+      const wanted = new URLSearchParams(window.location.search).get("filter");
+      if (wanted && ["pending", "approved", "rejected"].includes(wanted)) {
+        setFilter(wanted);
+      }
+    }
   }, []);
 
   async function toggleVisible(p: Product) {

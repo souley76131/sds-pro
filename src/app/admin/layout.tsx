@@ -25,6 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const supabase = createClient();
   const [ready, setReady] = useState(false);
   const [name, setName] = useState("Admin");
+  const [pendingProducts, setPendingProducts] = useState(0);
 
   const isLogin = pathname === "/admin/login";
 
@@ -55,6 +56,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       setName(profile.full_name || session.user.email?.split("@")[0] || "Admin");
       setReady(true);
+
+      const { count } = await supabase
+        .from("products")
+        .select("*", { count: "exact", head: true })
+        .eq("moderation_status", "pending");
+      setPendingProducts(count || 0);
     })();
   }, [pathname, isLogin, router, supabase]);
 
@@ -142,11 +149,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {TABS.map((t) => {
           const on = pathname === t.href;
+          const badge = t.href === "/admin/produits" ? pendingProducts : 0;
           return (
             <Link
               key={t.href}
               href={t.href}
               style={{
+                position: "relative",
                 padding: "14px 20px",
                 fontSize: 13,
                 fontWeight: 600,
@@ -157,6 +166,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               }}
             >
               {t.label}
+              {badge > 0 && (
+                <span
+                  style={{
+                    marginLeft: 6,
+                    minWidth: 16,
+                    height: 16,
+                    padding: "0 5px",
+                    borderRadius: 99,
+                    background: "#e11d48",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                    verticalAlign: 2,
+                  }}
+                >
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </Link>
           );
         })}

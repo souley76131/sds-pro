@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 function formatPrice(n: number) {
@@ -18,6 +19,7 @@ export default function AdminDashboardPage() {
     monthRevenue: 0,
   });
   const [recent, setRecent] = useState<any[]>([]);
+  const [pendingProducts, setPendingProducts] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -25,15 +27,17 @@ export default function AdminDashboardPage() {
       const now = new Date();
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-      const [ordersRes, productsRes, monthRes] = await Promise.all([
+      const [ordersRes, productsRes, monthRes, pendingRes] = await Promise.all([
         supabase.from("orders").select("*"),
         supabase.from("products").select("id,visible"),
         supabase.from("orders").select("*").gte("created_at", firstOfMonth),
+        supabase.from("products").select("*", { count: "exact", head: true }).eq("moderation_status", "pending"),
       ]);
 
       const orders = ordersRes.data || [];
       const products = productsRes.data || [];
       const monthOrders = monthRes.data || [];
+      setPendingProducts(pendingRes.count || 0);
 
       const emails = [...new Set(orders.map((o: any) => o.user_email).filter(Boolean))];
       const total = orders.reduce((s: number, o: any) => s + (o.prix || o.price || o.total || o.amount || 0), 0);
@@ -81,6 +85,35 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
+      {pendingProducts > 0 && (
+        <Link
+          href="/admin/produits?filter=pending"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            background: "rgba(255,145,0,0.1)",
+            border: "1px solid rgba(255,145,0,0.35)",
+            borderRadius: 14,
+            padding: "14px 16px",
+            marginBottom: 16,
+            textDecoration: "none",
+            color: "#fff",
+          }}
+        >
+          <div>
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700, color: "#ffb020" }}>
+              🕓 {pendingProducts} produit{pendingProducts > 1 ? "s" : ""} à valider
+            </div>
+            <div style={{ fontSize: 12, color: "#c8a878", marginTop: 2 }}>
+              Soumis par des boutiques partenaires — approuver pour les publier au catalogue.
+            </div>
+          </div>
+          <span style={{ color: "#ffb020", fontSize: 20 }}>→</span>
+        </Link>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
         {card(String(stats.orders), "COMMANDES", `${stats.monthOrders} ce mois`)}
         {card(String(stats.clients), "CLIENTS")}
