@@ -29,6 +29,7 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [videoVisible, setVideoVisible] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
     if (!product.video_url || typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
@@ -59,6 +60,19 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
       video.pause();
     }
   }, [videoVisible]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !soundOn;
+    video.volume = soundOn ? 1 : 0;
+  }, [soundOn]);
+
+  function toggleSound(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setSoundOn((v) => !v);
+  }
 
   return (
     <Link href={`/produit/${product.id}`} style={{ display: "block", textDecoration: "none", color: "inherit" }}>
@@ -97,7 +111,7 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
           {product.video_url ? (
             <video
               ref={videoRef}
-              muted
+              muted={!soundOn}
               playsInline
               loop
               preload="metadata"
@@ -154,6 +168,28 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
           >
             ▶ Vidéo
           </span>
+        )}
+
+        {product.video_url && (
+          <button
+            type="button"
+            onClick={toggleSound}
+            style={{
+              position: "absolute",
+              bottom: 10,
+              left: 10,
+              zIndex: 3,
+              padding: "6px 10px",
+              borderRadius: 999,
+              border: "none",
+              background: "rgba(0,0,0,0.65)",
+              color: "#fff",
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            {soundOn ? "🔊" : "🔇"}
+          </button>
         )}
 
         {product.badge && (
