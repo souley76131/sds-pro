@@ -652,10 +652,15 @@ export default function EspacePartenairePage() {
       const supabase = createClient();
 
       if (editId) {
-        const maj: any = { nom: pNom.trim(), modele: pModele.trim() || null, prix, emoji: pEmoji.trim() || "📱", marque: pMarque, categorie, specs: pSpecs.trim() || null };
+        const maj: any = {
+          nom: pNom.trim(), modele: pModele.trim() || null, prix, emoji: pEmoji.trim() || "📱", marque: pMarque, categorie, specs: pSpecs.trim() || null,
+          moderation_status: "pending",
+          moderated_at: null,
+          moderated_note: null,
+        };
         if (urlsPhotos.length) maj.images = urlsPhotos;
         if (urlVideo) maj.video_url = urlVideo;
-        const { error: err } = await supabase.from("products").update(maj).eq("id", editId);
+        const { error: err } = await supabase.from("products").update(maj).eq("id", editId).eq("boutique_id", boutique.id);
         if (err) throw err;
       } else {
         const { error: err } = await supabase.rpc("rpc_soumettre_produit", {
@@ -665,7 +670,11 @@ export default function EspacePartenairePage() {
         if (err) throw err;
       }
       setShowModal(false);
-      alert(editId ? "Produit modifié ✅" : "Produit soumis ✅\nIl sera visible après validation par SDS PRO.");
+      alert(
+        editId
+          ? "Produit modifié ✅\nIl repasse en attente de validation SDS PRO avant de réapparaître au catalogue."
+          : "Produit soumis ✅\nIl sera visible après validation par SDS PRO."
+      );
       await chargerProduits();
     } catch (e: any) {
       setProdErr("Erreur : " + (e.message || e));
@@ -881,9 +890,25 @@ export default function EspacePartenairePage() {
               <p style={{ color: "#7a9abb", fontSize: 14, textAlign: "center", padding: 30 }}>Aucun produit. Ajoutez-en un pour commencer.</p>
             )}
             {produits.map((p) => {
-              const st = p.statut_validation;
               const desactive = p.visible === false;
-              const actif = !desactive && st === "valide";
+              // moderation_status is the source of truth; statut_validation (older, French,
+              // set by the rpc_soumettre_produit submission RPC) is used as a fallback in
+              // case a given row only has one of the two populated.
+              const modStatus: "pending" | "approved" | "rejected" =
+                p.moderation_status ||
+                (p.statut_validation === "valide"
+                  ? "approved"
+                  : p.statut_validation === "refuse"
+                  ? "rejected"
+                  : p.statut_validation === "en_attente"
+                  ? "pending"
+                  : "approved");
+              const modBadge =
+                modStatus === "pending"
+                  ? { label: "En attente de validation", bg: "rgba(255,160,0,0.15)", color: "#ffb347" }
+                  : modStatus === "rejected"
+                  ? { label: "Refusé", bg: "rgba(248,113,113,0.15)", color: "#f87171" }
+                  : { label: "En ligne", bg: "rgba(52,211,153,0.15)", color: "#34d399" };
               const details = p.modele || (Array.isArray(p.specs) ? p.specs.join(" · ") : "");
               return (
                 <div
@@ -923,21 +948,25 @@ export default function EspacePartenairePage() {
                             fontSize: 11,
                             padding: "3px 10px",
                             borderRadius: 100,
-                            background: actif ? "rgba(52,211,153,0.15)" : "rgba(255,160,0,0.15)",
-                            color: actif ? "#34d399" : "#ffb347",
+                            background: desactive ? "rgba(122,154,187,0.15)" : modBadge.bg,
+                            color: desactive ? "#7a9abb" : modBadge.color,
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {actif ? "En ligne" : "Désactivé"}
+                          {desactive ? "Désactivé" : modBadge.label}
                         </span>
                       </div>
                       <div style={{ fontSize: 12, color: "#7a9abb", marginBottom: 6 }}>
                         {details}
                       </div>
+                      {modStatus === "rejected" && (p.moderated_note || p.motif_refus) && (
+                        <div style={{ fontSize: 12, color: "#f87171", marginBottom: 6 }}>
+                          Motif : {p.moderated_note || p.motif_refus}
+                        </div>
+                      )}
                       <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 22, fontWeight: 700, color: "#00c8ff" }}>
                         {Number(p.prix || 0).toLocaleString("fr-FR")} <small style={{ fontSize: 11, color: "#7a9abb" }}>FCFA</small>
                       </div>
-                      {st === "refuse" && p.motif_refus && <div style={{ color: "#ff5a6e", fontSize: 12, marginTop: 6 }}>Motif : {p.motif_refus}</div>}
                     </div>
                   </div>
 
@@ -950,7 +979,7 @@ export default function EspacePartenairePage() {
                     }}
                   >
                     <button onClick={() => ouvrirModifier(p)} style={btnSoft}>Modifier</button>
-                    <button onClick={() => toggleVisible(p)} style={actif ? btnWarn : btnOk}>{actif ? "Désactiver" : "Activer"}</button>
+                    <button onClick={() => toggleVisible(p)} style={!desactive ? btnWarn : btnOk}>{!desactive ? "Désactiver" : "Activer"}</button>
                     <button onClick={() => supprimerProduit(p.id)} style={btnDanger}>Supprimer</button>
                   </div>
                 </div>

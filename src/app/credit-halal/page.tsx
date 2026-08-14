@@ -55,6 +55,7 @@ export default function CreditHalalPage() {
         .from("products")
         .select("id,nom,prix,emoji,modele")
         .eq("visible", true)
+        .eq("moderation_status", "approved")
         .order("id", { ascending: true });
 
       setProducts(data || []);

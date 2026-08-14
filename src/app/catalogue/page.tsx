@@ -132,7 +132,8 @@ export default function CataloguePage() {
           .from("products")
           .select("id", { count: "exact", head: true })
           .eq("boutique_id", currentBoutiqueId)
-          .eq("visible", true);
+          .eq("visible", true)
+          .eq("moderation_status", "approved");
 
         setBoutiqueProductCount(productCount || 0);
 
@@ -142,6 +143,7 @@ export default function CataloguePage() {
           .select("price")
           .eq("boutique_id", currentBoutiqueId)
           .eq("visible", true)
+          .eq("moderation_status", "approved")
           .order("price", { ascending: true })
           .limit(1);
 
@@ -190,6 +192,7 @@ export default function CataloguePage() {
           .from("products")
           .select("*")
           .eq("visible", true)
+          .eq("moderation_status", "approved")
           .order("id", { ascending: true });
 
         if (error) {

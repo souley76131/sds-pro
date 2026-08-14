@@ -123,6 +123,11 @@ export default function ProductDetailPage() {
 
       try {
         let { data, error: err } = await supabase.from("products").select("*").eq("id", id).maybeSingle();
+        if (data && data.moderation_status && data.moderation_status !== "approved") {
+          setError("Produit indisponible.");
+          setProduct(null);
+          return;
+        }
         if (err || !data) {
           const fallback = await supabase.from("produits").select("*").eq("id", id).maybeSingle();
           if (fallback.error || !fallback.data) {

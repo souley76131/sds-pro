@@ -21,6 +21,9 @@ type Product = {
   video_url?: string;
   variantes?: any;
   categorie?: string;
+  boutique_id?: string | null;
+  moderation_status?: "pending" | "approved" | "rejected" | null;
+  moderated_note?: string | null;
 };
 
 function formatPrice(n: number) {
@@ -30,6 +33,7 @@ function formatPrice(n: number) {
 export default function AdminProduitsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [products, setProducts] = useState<Product[]>([]);
+  const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -74,6 +78,22 @@ export default function AdminProduitsPage() {
     const { error } = await supabase.from("products").update({ visible: next }).eq("id", p.id);
     if (!error) {
       showToast(next ? "Produit activé ✅" : "Produit désactivé 🔴");
+      load();
+    } else showToast("Erreur : " + error.message);
+  }
+
+  async function moderer(p: Product, status: "approved" | "rejected") {
+    const note = status === "rejected" ? window.prompt("Motif du refus (optionnel) :") || null : null;
+    const { error } = await supabase
+      .from("products")
+      .update({
+        moderation_status: status,
+        moderated_at: new Date().toISOString(),
+        moderated_note: note,
+      })
+      .eq("id", p.id);
+    if (!error) {
+      showToast(status === "approved" ? "✅ Produit approuvé" : "🔴 Produit refusé");
       load();
     } else showToast("Erreur : " + error.message);
   }
@@ -153,6 +173,9 @@ export default function AdminProduitsPage() {
       images,
       video_url: videoUrl.trim() || null,
       visible: true,
+      moderation_status: "approved",
+      moderated_at: new Date().toISOString(),
+      moderated_note: null,
     };
 
     setSaving(true);
@@ -211,6 +234,34 @@ export default function AdminProduitsPage() {
         </button>
       </div>
 
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
+        {[
+          ["all", "Toutes"],
+          ["pending", "En attente"],
+          ["approved", "Approuvées"],
+          ["rejected", "Refusées"],
+        ].map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setFilter(id)}
+            style={{
+              padding: "7px 14px",
+              borderRadius: 100,
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              border: filter === id ? "none" : "1px solid rgba(0,180,255,0.18)",
+              background: filter === id ? "linear-gradient(135deg,#0050ff,#00e5ff)" : "rgba(0,100,255,0.04)",
+              color: filter === id ? "#fff" : "#4a7a9b",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {loading && <div style={{ color: "#4a7a9b", textAlign: "center", padding: 30 }}>Chargement…</div>}
 
       {!loading && !products.length && (
@@ -220,11 +271,20 @@ export default function AdminProduitsPage() {
         </div>
       )}
 
-      {products.map((p) => {
+      {products
+        .filter((p) => filter === "all" || (p.moderation_status || "approved") === filter)
+        .map((p) => {
         const visible = p.visible !== false;
         const title = p.nom || p.name || "—";
         const model = p.modele || p.model || "";
         const price = p.prix || p.price || 0;
+        const modStatus = p.moderation_status || "approved";
+        const modMeta =
+          modStatus === "pending"
+            ? { label: "🕓 En attente", color: "#ffb020" }
+            : modStatus === "rejected"
+            ? { label: "🔴 Refusé", color: "#ff4444" }
+            : { label: "✅ Approuvé", color: "#00e676" };
 
         return (
           <div
@@ -251,19 +311,33 @@ export default function AdminProduitsPage() {
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-              <span
-                style={{
-                  fontSize: 11,
-                  padding: "3px 10px",
-                  borderRadius: 100,
-                  color: visible ? "#00e676" : "#ff4444",
-                  background: visible ? "rgba(0,230,118,0.15)" : "rgba(255,68,68,0.15)",
-                  border: `1px solid ${visible ? "rgba(0,230,118,0.3)" : "rgba(255,68,68,0.3)"}`,
-                }}
-              >
-                {visible ? "✅ Actif" : "🔴 Désactivé"}
-              </span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: "3px 10px",
+                    borderRadius: 100,
+                    color: visible ? "#00e676" : "#ff4444",
+                    background: visible ? "rgba(0,230,118,0.15)" : "rgba(255,68,68,0.15)",
+                    border: `1px solid ${visible ? "rgba(0,230,118,0.3)" : "rgba(255,68,68,0.3)"}`,
+                  }}
+                >
+                  {visible ? "✅ Actif" : "🔴 Désactivé"}
+                </span>
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: "3px 10px",
+                    borderRadius: 100,
+                    color: modMeta.color,
+                    background: `${modMeta.color}22`,
+                    border: `1px solid ${modMeta.color}55`,
+                  }}
+                >
+                  {modMeta.label}
+                </span>
+              </div>
 
               <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                 <span style={{ fontSize: 11, color: "#4a7a9b", fontFamily: "DM Mono, monospace" }}>
@@ -272,6 +346,49 @@ export default function AdminProduitsPage() {
                 <input type="checkbox" checked={visible} onChange={() => toggleVisible(p)} />
               </label>
             </div>
+
+            {p.moderated_note && modStatus === "rejected" && (
+              <div style={{ fontSize: 11, color: "#ff8080", marginBottom: 10 }}>Motif : {p.moderated_note}</div>
+            )}
+
+            {modStatus !== "approved" && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => moderer(p, "approved")}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    border: "1px solid rgba(0,230,118,0.3)",
+                    background: "rgba(0,230,118,0.1)",
+                    color: "#00e676",
+                  }}
+                >
+                  ✅ Approuver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moderer(p, "rejected")}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    border: "1px solid rgba(255,68,68,0.25)",
+                    background: "rgba(255,68,68,0.1)",
+                    color: "#ff4444",
+                  }}
+                >
+                  🔴 Refuser
+                </button>
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 8 }}>
               <button
