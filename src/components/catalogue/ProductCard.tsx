@@ -65,8 +65,10 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
       <div
         ref={cardRef}
         style={{
-          background: "rgba(7,24,40,0.7)",
-          border: "1px solid rgba(0,180,255,0.22)",
+          background: "rgba(7,24,40,0.12)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          border: "1px solid rgba(0,180,255,0.18)",
           borderRadius: 16,
           overflow: "hidden",
           cursor: "pointer",
@@ -80,10 +82,18 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "none";
-          e.currentTarget.style.borderColor = "rgba(0,180,255,0.22)";
+          e.currentTarget.style.borderColor = "rgba(0,180,255,0.18)";
           e.currentTarget.style.boxShadow = "none";
         }}
       >
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          background: "linear-gradient(180deg, rgba(2,9,17,0.02) 0%, rgba(2,9,17,0.48) 50%, rgba(2,9,17,0.8) 100%)",
+        }}
+      />
       {/* Image zone */}
       <div
         style={{
@@ -95,6 +105,7 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
           fontSize: 56,
           position: "relative",
           overflow: "hidden",
+          zIndex: 1,
         }}
       >
         {product.video_url ? (
@@ -106,7 +117,7 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
             preload="metadata"
             poster={product.images?.[0] ?? undefined}
             src={product.video_url}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : product.images && product.images.length > 0 ? (
           <img
@@ -174,12 +185,22 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
       </div>
 
       {/* Body */}
-      <div style={{ padding: 16 }}>
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          padding: "12px 14px 14px",
+          background: "linear-gradient(180deg, rgba(4,14,28,0.08) 0%, rgba(4,14,28,0.46) 38%, rgba(4,14,28,0.68) 100%)",
+          backdropFilter: "blur(4px)",
+          WebkitBackdropFilter: "blur(4px)",
+          borderTop: "1px solid rgba(0, 180, 255, 0.10)",
+        }}
+      >
         <div
           style={{
             fontFamily: "DM Mono, monospace",
             fontSize: 9,
-            color: "#7a9abb",
+            color: "#9eb6d0",
             letterSpacing: 2,
             marginBottom: 4,
             textTransform: "uppercase",

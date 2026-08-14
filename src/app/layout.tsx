@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://sdsprotech.com"),
   title: "SDS PRO | Smartphones & Crédit Halal à Dakar",
   description:
-    "Boutique smartphones premium à Dakar (Pikine, Petit Mbao). iPhone, Samsung, Infinix, Tecno. Paiement mobile et achat échelonné halal. NINEA 013038395 · D-U-N-S 669805885.",
+    "Commerce général, accessoires téléphoniques, vente en ligne et dépannage. MDM & crédit phone pour boutiques partenaires — Dakar. NINEA 013038395 · RCCM SN DKR 2026 A 16899 · D-U-N-S 669805885.",
   keywords: [
     "smartphones Dakar",
     "téléphones Pikine",

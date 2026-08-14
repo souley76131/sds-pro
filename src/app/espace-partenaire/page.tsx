@@ -10,6 +10,7 @@ type Boutique = {
   proprietaire?: string;
   ville?: string;
   logo_url?: string;
+  hero_videos?: string[] | string | null;
 };
 
 export default function EspacePartenairePage() {
@@ -22,7 +23,11 @@ export default function EspacePartenairePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [boutique, setBoutique] = useState<Boutique | null>(null);
-  const [tab, setTab] = useState<"cmd" | "prod" | "vers" | "msg">("cmd");
+  const [tab, setTab] = useState<"cmd" | "prod" | "vers" | "msg" | "vitrine">("cmd");
+
+  const [heroVideos, setHeroVideos] = useState<string[]>([]);
+  const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [videoMsg, setVideoMsg] = useState("");
 
   const [nom, setNom] = useState("");
   const [prop, setProp] = useState("");
@@ -86,7 +91,7 @@ export default function EspacePartenairePage() {
     }
     const { data: rows } = await supabase
       .from("boutiques")
-      .select("id,nom,logo_url,proprietaire,ville")
+      .select("id,nom,logo_url,proprietaire,ville,hero_videos")
       .eq("id", bid)
       .limit(1);
     setBoutique((rows && rows[0]) || { id: bid, nom: "Ma boutique" });
@@ -206,6 +211,56 @@ export default function EspacePartenairePage() {
     setView("login");
     setEmail("");
     setPassword("");
+  }
+
+  useEffect(() => {
+    if (!boutique?.id) return;
+    const raw = boutique.hero_videos;
+    let list: string[] = [];
+    if (Array.isArray(raw)) {
+      list = raw;
+    } else if (typeof raw === "string") {
+      try {
+        list = JSON.parse(raw || "[]");
+      } catch {
+        list = [];
+      }
+    }
+    setHeroVideos(list.filter(Boolean));
+  }, [boutique?.id]);
+
+  async function saveVideos(next: string[]) {
+    setVideoMsg("");
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("boutiques")
+      .update({ hero_videos: next })
+      .eq("id", boutique?.id);
+    if (error) {
+      setVideoMsg("Erreur : " + error.message);
+      return;
+    }
+    setHeroVideos(next);
+    setVideoMsg("✓ Vidéos enregistrées");
+    setTimeout(() => setVideoMsg(""), 3000);
+  }
+
+  async function addVideo() {
+    const url = newVideoUrl.trim();
+    if (!url) {
+      setVideoMsg("URL requise");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      setVideoMsg("URL invalide (doit commencer par http:// ou https://)");
+      return;
+    }
+    await saveVideos([...heroVideos, url]);
+    setNewVideoUrl("");
+  }
+
+  async function removeVideo(index: number) {
+    await saveVideos(heroVideos.filter((_, i) => i !== index));
   }
 
   async function chargerResume() {
@@ -580,7 +635,7 @@ export default function EspacePartenairePage() {
     return (
       <main style={pageStyle}>
         <div style={cardStyle}>
-          <div style={brandStyle}>SECK <span style={{ color: "#00c8ff" }}>DIGITAL</span> SERVICES PRO</div>
+          <div style={brandStyle}><span style={{ color: "#fff" }}>SECK</span> <span style={{ color: "#00c8ff" }}>DIGITAL</span> <span style={{ color: "#fff" }}>SERVICES</span> <span style={{ color: "#00c8ff" }}>PRO</span></div>
           <div style={subStyle}>Espace partenaire</div>
           <Field label="Email"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></Field>
           <Field label="Mot de passe"><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && connexion()} style={inputStyle} /></Field>
@@ -599,7 +654,7 @@ export default function EspacePartenairePage() {
     return (
       <main style={pageStyle}>
         <div style={cardStyle}>
-          <div style={brandStyle}>SECK <span style={{ color: "#00c8ff" }}>DIGITAL</span> SERVICES PRO</div>
+          <div style={brandStyle}><span style={{ color: "#fff" }}>SECK</span> <span style={{ color: "#00c8ff" }}>DIGITAL</span> <span style={{ color: "#fff" }}>SERVICES</span> <span style={{ color: "#00c8ff" }}>PRO</span></div>
           <div style={subStyle}>Créer votre compte partenaire</div>
           <Field label="Email (Gmail, Hotmail, Yahoo, Outlook)">
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="vous@gmail.com" />
@@ -630,7 +685,7 @@ export default function EspacePartenairePage() {
     return (
       <main style={pageStyle}>
         <div style={{ ...cardStyle, maxWidth: 440 }}>
-          <div style={brandStyle}>SECK <span style={{ color: "#00c8ff" }}>DIGITAL</span> SERVICES PRO</div>
+          <div style={brandStyle}><span style={{ color: "#fff" }}>SECK</span> <span style={{ color: "#00c8ff" }}>DIGITAL</span> <span style={{ color: "#fff" }}>SERVICES</span> <span style={{ color: "#00c8ff" }}>PRO</span></div>
           <div style={subStyle}>Créez votre boutique</div>
           {!merci ? (
             <>
@@ -665,6 +720,9 @@ export default function EspacePartenairePage() {
         <div style={{ flex: 1 }}>
           <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 19, fontWeight: 700 }}>{boutique?.nom || "Ma boutique"}</div>
           <div style={{ color: "#7a9abb", fontSize: 12 }}>{[boutique?.proprietaire, boutique?.ville].filter(Boolean).join(" · ") || "Espace partenaire"}</div>
+          <div style={{ color: "#eaf7ff", fontSize: 11, marginTop: 6, lineHeight: 1.5 }}>
+            SECK DIGITAL SERVICES PRO (SDS PRO) · Commerce général, accessoires téléphoniques, vente en ligne et dépannage.
+          </div>
         </div>
         <button onClick={deconnexion} style={logoutBtn}>Déconnexion</button>
       </div>
@@ -676,7 +734,7 @@ export default function EspacePartenairePage() {
       </div>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-        {([["cmd", "Commandes"], ["prod", "Mes produits"], ["vers", "Versements"], ["msg", "Messagerie"]] as const).map(([id, label]) => (
+        {([["cmd", "Commandes"], ["prod", "Mes produits"], ["vers", "Versements"], ["msg", "Messagerie"], ["vitrine", "Ma vitrine"]] as const).map(([id, label]) => (
           <button
             key={id}
             onClick={() => {
@@ -748,7 +806,9 @@ export default function EspacePartenairePage() {
                 <div
                   key={p.id}
                   style={{
-                    background: "rgba(7,24,40,0.7)",
+                    background: "rgba(7,24,40,0.58)",
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
                     border: "1px solid rgba(0,180,255,0.22)",
                     borderRadius: 16,
                     padding: 16,
@@ -1155,6 +1215,106 @@ export default function EspacePartenairePage() {
                 </button>
               </div>
             ) : null}
+          </div>
+        )}
+
+        {tab === "vitrine" && (
+          <div>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, color: "#00c8ff" }}>
+                ✨ Ma vitrine
+              </div>
+              <div style={{ color: "#7a9abb", fontSize: 13 }}>Personnalisez le bandeau hero de votre boutique</div>
+            </div>
+
+            <div style={{ marginTop: 24, padding: 16, border: "1px solid rgba(0,180,255,0.25)", borderRadius: 12 }}>
+              <h3 style={{ marginTop: 0, color: "#00c8ff", fontSize: 15, fontWeight: 700 }}>📹 Vidéos du bandeau</h3>
+              <p style={{ fontSize: 13, color: "#9eb6d0", marginBottom: 14 }}>
+                URLs MP4 (Supabase Storage, Cloudflare, etc.). Chaque vidéo s'affiche 6 secondes. Max conseillé : 3.
+              </p>
+
+              {heroVideos.length > 0 && (
+                <div style={{ marginBottom: 16, padding: 12, background: "rgba(0,100,100,0.08)", borderRadius: 8, border: "1px solid rgba(0,200,200,0.2)" }}>
+                  <div style={{ fontSize: 12, color: "#7a9abb", marginBottom: 8, fontWeight: 600 }}>
+                    {heroVideos.length} vidéo{heroVideos.length > 1 ? "s" : ""} en ligne
+                  </div>
+                  {heroVideos.map((url, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8, padding: 8, background: "rgba(0,0,0,0.2)", borderRadius: 6 }}>
+                      <span style={{ flex: 1, fontSize: 12, color: "#c8dff5", wordBreak: "break-all", fontFamily: "monospace" }}>
+                        {i + 1}. {url.length > 50 ? url.substring(0, 47) + "…" : url}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeVideo(i)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid rgba(248,113,113,0.4)",
+                          background: "rgba(248,113,113,0.08)",
+                          color: "#f87171",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12 }}>
+                <input
+                  type="text"
+                  value={newVideoUrl}
+                  onChange={(e) => setNewVideoUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addVideo()}
+                  placeholder="https://example.com/video.mp4"
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid rgba(0,180,255,0.22)",
+                    background: "rgba(7,24,40,0.7)",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontFamily: "monospace",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addVideo}
+                  style={{
+                    padding: "10px 18px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "linear-gradient(135deg, #0055ff, #00c8ff)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  Ajouter
+                </button>
+              </div>
+
+              {videoMsg && (
+                <div
+                  style={{
+                    padding: 10,
+                    borderRadius: 8,
+                    background: videoMsg.includes("Erreur") ? "rgba(248,113,113,0.12)" : "rgba(52,211,153,0.12)",
+                    border: videoMsg.includes("Erreur") ? "1px solid rgba(248,113,113,0.3)" : "1px solid rgba(52,211,153,0.3)",
+                    color: videoMsg.includes("Erreur") ? "#f87171" : "#34d399",
+                    fontSize: 13,
+                  }}
+                >
+                  {videoMsg}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

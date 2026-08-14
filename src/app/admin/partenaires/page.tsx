@@ -18,6 +18,7 @@ type Boutique = {
   owner_id?: string;
   created_at?: string;
   commission?: number;
+  hero_videos?: string[] | string | null;
 };
 
 type Order = {
@@ -56,6 +57,9 @@ export default function AdminPartenairesPage() {
   const [selected, setSelected] = useState<Boutique | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [heroVideos, setHeroVideos] = useState<string[]>([]);
+  const [newVideoUrl, setNewVideoUrl] = useState("");
+  const [videoMsg, setVideoMsg] = useState("");
 
   function showToast(msg: string) {
     setToast(msg);
@@ -89,6 +93,22 @@ export default function AdminPartenairesPage() {
   async function openDetail(b: Boutique) {
     setSelected(b);
     setOrdersLoading(true);
+    
+    // Load hero videos
+    let list: string[] = [];
+    if (b.hero_videos) {
+      if (Array.isArray(b.hero_videos)) {
+        list = b.hero_videos;
+      } else if (typeof b.hero_videos === "string") {
+        try {
+          list = JSON.parse(b.hero_videos || "[]");
+        } catch {
+          list = [];
+        }
+      }
+    }
+    setHeroVideos(list.filter(Boolean));
+    
     const { data } = await supabase
       .from("orders")
       .select("*")
@@ -96,6 +116,40 @@ export default function AdminPartenairesPage() {
       .order("created_at", { ascending: false });
     setOrders(data || []);
     setOrdersLoading(false);
+  }
+
+  async function saveVideos(next: string[]) {
+    if (!selected?.id) return;
+    setVideoMsg("");
+    const { error } = await supabase
+      .from("boutiques")
+      .update({ hero_videos: next })
+      .eq("id", selected.id);
+    if (error) {
+      setVideoMsg("Erreur : " + error.message);
+      return;
+    }
+    setHeroVideos(next);
+    setVideoMsg("✓ Vidéos enregistrées");
+    setTimeout(() => setVideoMsg(""), 3000);
+  }
+
+  async function addVideo() {
+    const url = newVideoUrl.trim();
+    if (!url) {
+      setVideoMsg("URL requise");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      setVideoMsg("URL invalide (doit commencer par http:// ou https://)");
+      return;
+    }
+    await saveVideos([...heroVideos, url]);
+    setNewVideoUrl("");
+  }
+
+  async function removeVideo(index: number) {
+    await saveVideos(heroVideos.filter((_, i) => i !== index));
   }
 
   const filtered = rows.filter((b) => {
@@ -307,6 +361,91 @@ export default function AdminPartenairesPage() {
                 {formatPrice(caBoutique)} FCFA
               </div>
               <div style={{ fontSize: 12, color: "#7a9abb" }}>{orders.length} commande(s)</div>
+            </div>
+
+            <div style={{ marginTop: 18, marginBottom: 14, padding: 12, borderRadius: 12, background: "rgba(0,150,150,0.08)", border: "1px solid rgba(0,200,200,0.2)" }}>
+              <div style={{ fontSize: 11, color: "#4a7a9b", fontFamily: "DM Mono, monospace", marginBottom: 8, fontWeight: 600 }}>
+                📹 VIDÉOS DU BANDEAU
+              </div>
+              
+              {heroVideos.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  {heroVideos.map((url, i) => (
+                    <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, padding: 6, background: "rgba(0,0,0,0.2)", borderRadius: 6 }}>
+                      <span style={{ flex: 1, fontSize: 11, color: "#c8dff5", wordBreak: "break-all", fontFamily: "monospace" }}>
+                        {i + 1}. {url.length > 40 ? url.substring(0, 37) + "…" : url}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeVideo(i)}
+                        style={{
+                          padding: "3px 8px",
+                          borderRadius: 4,
+                          border: "1px solid rgba(248,113,113,0.3)",
+                          background: "rgba(248,113,113,0.08)",
+                          color: "#f87171",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <input
+                  type="text"
+                  value={newVideoUrl}
+                  onChange={(e) => setNewVideoUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addVideo()}
+                  placeholder="https://.../video.mp4"
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: "1px solid rgba(0,180,255,0.18)",
+                    background: "rgba(7,24,40,0.6)",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addVideo}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "linear-gradient(135deg, #0055ff, #00c8ff)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  Ajouter
+                </button>
+              </div>
+
+              {videoMsg && (
+                <div
+                  style={{
+                    padding: 8,
+                    borderRadius: 6,
+                    background: videoMsg.includes("Erreur") ? "rgba(248,113,113,0.12)" : "rgba(52,211,153,0.12)",
+                    border: videoMsg.includes("Erreur") ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(52,211,153,0.25)",
+                    color: videoMsg.includes("Erreur") ? "#f87171" : "#34d399",
+                    fontSize: 11,
+                  }}
+                >
+                  {videoMsg}
+                </div>
+              )}
             </div>
 
             <div style={{ fontSize: 11, color: "#4a7a9b", fontFamily: "DM Mono, monospace", marginBottom: 8 }}>

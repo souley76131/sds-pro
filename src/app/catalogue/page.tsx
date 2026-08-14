@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import BuyFlow from "@/components/buy/BuyFlow";
 import ProductCard from "@/components/catalogue/ProductCard";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +22,14 @@ type Product = {
   variantes?: { stockage?: string; couleur?: string; prix?: number; image?: string }[];
 };
 
+type BoutiqueMeta = {
+  nom?: string;
+  logo?: string;
+  telephone?: string;
+  whatsapp?: string;
+  heroVideos?: string[];
+};
+
 const BRANDS = [
   { id: "apple", name: "Apple" },
   { id: "samsung", name: "Samsung" },
@@ -36,6 +44,9 @@ export default function CataloguePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("Chargement…");
   const [currentBoutiqueId, setCurrentBoutiqueId] = useState<string | null>(null);
+  const [boutiqueMeta, setBoutiqueMeta] = useState<BoutiqueMeta | null>(null);
+  const [boutiqueProductCount, setBoutiqueProductCount] = useState(0);
+  const [boutiqueMinPrice, setBoutiqueMinPrice] = useState<number | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [buyProduct, setBuyProduct] = useState<Product | null>(null);
   const [choiceOpen, setChoiceOpen] = useState(false);
@@ -55,6 +66,95 @@ export default function CataloguePage() {
       window.sessionStorage.setItem("sds_boutique_id", found);
     }
   }, []);
+
+  useEffect(() => {
+    if (!currentBoutiqueId) {
+      setBoutiqueMeta(null);
+      return;
+    }
+
+    const loadBoutiqueMeta = async () => {
+      try {
+        const supabase = createClient();
+        
+        // Load boutique info - try with hero_videos first, then fallback
+        let boutique = null;
+        let heroVidsData: string[] = [];
+
+        // First try to get all fields including hero_videos
+        const { data, error } = await supabase
+          .from("boutiques")
+          .select("id, nom, name, logo_url, telephone, whatsapp, hero_videos")
+          .eq("id", currentBoutiqueId)
+          .maybeSingle();
+
+        if (data) {
+          boutique = data;
+          
+          // Parse hero_videos safely
+          if (boutique.hero_videos) {
+            if (typeof boutique.hero_videos === 'string') {
+              try {
+                heroVidsData = JSON.parse(boutique.hero_videos);
+              } catch {
+                heroVidsData = [];
+              }
+            } else if (Array.isArray(boutique.hero_videos)) {
+              heroVidsData = boutique.hero_videos;
+            }
+          }
+        }
+
+        // If hero_videos column doesn't exist, fallback query without it
+        if (!data && error && error.message.includes('hero_videos')) {
+          const { data: fallback } = await supabase
+            .from("boutiques")
+            .select("id, nom, name, logo_url, telephone, whatsapp")
+            .eq("id", currentBoutiqueId)
+            .maybeSingle();
+          
+          boutique = fallback;
+        }
+
+        if (boutique) {
+          setBoutiqueMeta({
+            nom: boutique.nom || boutique.name || "Boutique",
+            logo: boutique.logo_url || undefined,
+            telephone: boutique.telephone || undefined,
+            whatsapp: boutique.whatsapp || undefined,
+            heroVideos: heroVidsData.filter(Boolean),
+          });
+        }
+
+        // Count products for this boutique
+        const { count: productCount } = await supabase
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("boutique_id", currentBoutiqueId)
+          .eq("visible", true);
+
+        setBoutiqueProductCount(productCount || 0);
+
+        // Find minimum price for this boutique
+        const { data: minPriceData } = await supabase
+          .from("products")
+          .select("price")
+          .eq("boutique_id", currentBoutiqueId)
+          .eq("visible", true)
+          .order("price", { ascending: true })
+          .limit(1);
+
+        if (minPriceData && minPriceData.length > 0) {
+          setBoutiqueMinPrice(Number(minPriceData[0].price || 0));
+        }
+      } catch (err) {
+        console.error("Error loading boutique meta:", err);
+        setBoutiqueMeta(null);
+      }
+    };
+
+    loadBoutiqueMeta();
+  }, [currentBoutiqueId]);
 
   useEffect(() => {
     async function load() {
@@ -212,39 +312,15 @@ export default function CataloguePage() {
   return (
     <main style={{ paddingTop: 80, paddingBottom: 80, minHeight: "100vh" }}>
       <div style={{ maxWidth: 1440, margin: "0 auto", padding: "0 20px" }}>
-        <div
-          style={{
-            fontFamily: "DM Mono, monospace",
-            fontSize: 10,
-            letterSpacing: 3,
-            color: "#00c8ff",
-            textTransform: "uppercase",
-            marginBottom: 10,
-          }}
-        >
-          // Catalogue complet
-        </div>
-
-        <h1
-          style={{
-            fontFamily: "Rajdhani, sans-serif",
-            fontSize: "clamp(28px, 5vw, 52px)",
-            fontWeight: 700,
-            letterSpacing: 2,
-            textTransform: "uppercase",
-            marginBottom: 40,
-          }}
-        >
-          SMARTPHONES{" "}
-          <span
-            style={{
-              WebkitTextStroke: "1px rgba(0,200,255,0.2)",
-              color: "transparent",
-            }}
-          >
-            PREMIUM
-          </span>
-        </h1>
+        <CatalogueHero 
+          boutiqueNom={boutiqueMeta?.nom} 
+          boutiqueLogo={boutiqueMeta?.logo}
+          telephone={boutiqueMeta?.telephone}
+          whatsapp={boutiqueMeta?.whatsapp}
+          productCount={boutiqueProductCount}
+          minPrice={boutiqueMinPrice}
+          heroVideos={boutiqueMeta?.heroVideos}
+        />
 
         {(loading || message) && (
           <p style={{ color: "#7a9abb", marginBottom: 24, fontSize: 14 }}>
@@ -360,7 +436,7 @@ export default function CataloguePage() {
                   <div
                     style={{
                       padding: "20px 28px 28px",
-                      background: "rgba(4,14,28,0.6)",
+                      background: "transparent",
                     }}
                   >
                     {brandProducts.length === 0 ? (
@@ -505,5 +581,253 @@ export default function CataloguePage() {
         onClose={() => setBuyProduct(null)}
       />
     </main>
+  );
+}
+
+function CatalogueHero({
+  boutiqueNom,
+  boutiqueLogo,
+  telephone,
+  whatsapp,
+  productCount = 0,
+  minPrice,
+  heroVideos = [],
+}: {
+  boutiqueNom?: string;
+  boutiqueLogo?: string;
+  telephone?: string;
+  whatsapp?: string;
+  productCount?: number;
+  minPrice?: number | null;
+  heroVideos?: string[];
+}) {
+  const [videoIndex, setVideoIndex] = useState(0);
+  const [withSound, setWithSound] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const currentVideo = heroVideos && heroVideos.length > 0 
+    ? heroVideos[videoIndex % heroVideos.length] 
+    : null;
+
+  useEffect(() => {
+    const videos = heroVideos && Array.isArray(heroVideos) ? heroVideos.filter(Boolean) : [];
+
+    if (typeof window !== "undefined") {
+      console.log("Hero videos loaded:", videos.length, videos);
+    }
+
+    if (videos.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setVideoIndex((v) => (v + 1) % videos.length);
+    }, 6000);
+
+    return () => clearInterval(timer);
+  }, [heroVideos]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !withSound;
+    v.volume = withSound ? 1 : 0;
+    if (withSound) {
+      v.play().catch(() => undefined);
+    }
+  }, [withSound, currentVideo]);
+
+  const contact = whatsapp || telephone;
+
+  function enableSound() {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = false;
+    v.volume = 1;
+    v.play().catch(() => undefined);
+    setWithSound(true);
+  }
+
+  return (
+    <section
+      style={{
+        position: "relative",
+        minHeight: 320,
+        height: "min(48vh, 420px)",
+        borderRadius: 16,
+        overflow: "hidden",
+        marginBottom: 28,
+        border: "1px solid rgba(0,200,255,0.22)",
+        background: "#04101c",
+      }}
+    >
+      {currentVideo && (
+        <video
+          ref={videoRef}
+          key={currentVideo}
+          src={currentVideo}
+          autoPlay
+          muted={!withSound}
+          loop
+          playsInline
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: 0.55,
+          }}
+        />
+      )}
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "linear-gradient(90deg, rgba(2,10,20,0.9), rgba(2,10,20,0.5))",
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 1,
+          padding: "32px 40px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          minHeight: "100%",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+          {boutiqueLogo && (
+            <img
+              src={boutiqueLogo}
+              alt=""
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                objectFit: "cover",
+                border: "2px solid rgba(0,200,255,0.4)",
+                boxShadow: "0 8px 24px rgba(0,200,255,0.15)",
+              }}
+            />
+          )}
+          <div>
+            <div
+              style={{
+                fontFamily: "DM Mono, monospace",
+                fontSize: 11,
+                letterSpacing: 2,
+                color: "#00c8ff",
+                textTransform: "uppercase",
+                marginBottom: 4,
+              }}
+            >
+              Bienvenue chez
+            </div>
+            <h1
+              style={{
+                margin: 0,
+                fontFamily: "Rajdhani, sans-serif",
+                fontSize: "clamp(24px, 5vw, 42px)",
+                fontWeight: 700,
+                color: "#fff",
+                letterSpacing: 1,
+              }}
+            >
+              {boutiqueNom || "SDS PRO"}
+            </h1>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 20,
+            color: "#9eb6d0",
+            fontSize: "clamp(13px, 2vw, 15px)",
+            fontFamily: "Outfit, sans-serif",
+          }}
+        >
+          {contact && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📞</span>
+              <span style={{ color: "#00c8ff", fontWeight: 600 }}>{contact}</span>
+            </div>
+          )}
+          {productCount > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📦</span>
+              <span style={{ color: "#34d399", fontWeight: 600 }}>
+                {productCount} produit{productCount > 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+          {minPrice !== null && minPrice !== undefined && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>💰</span>
+              <span style={{ color: "#fb923c", fontWeight: 600 }}>
+                dès {minPrice.toLocaleString("fr-FR")} FCFA
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {currentVideo && (
+        <button
+          type="button"
+          onClick={enableSound}
+          style={{
+            position: "absolute",
+            right: 16,
+            bottom: 16,
+            zIndex: 3,
+            padding: "8px 12px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.24)",
+            background: "rgba(0,0,0,0.55)",
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: 13,
+            fontWeight: 600,
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          {withSound ? "🔊 Son activé" : "🔇 Activer le son"}
+        </button>
+      )}
+
+      {heroVideos && heroVideos.length > 1 && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 16,
+            left: 0,
+            right: 0,
+            display: "flex",
+            justifyContent: "center",
+            gap: 8,
+            zIndex: 2,
+          }}
+        >
+          {heroVideos.map((_, idx) => (
+            <div
+              key={idx}
+              style={{
+                width: idx === videoIndex ? 18 : 8,
+                height: 8,
+                borderRadius: 99,
+                background:
+                  idx === videoIndex ? "#00c8ff" : "rgba(255,255,255,0.25)",
+                transition: "all 0.3s ease",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

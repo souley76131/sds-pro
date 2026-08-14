@@ -99,7 +99,9 @@ export default function PanierPage() {
         <div
           key={`${item.productId}-${item.storage || ""}-${item.color || ""}-${index}`}
           style={{
-            background: "rgba(7,24,40,0.7)",
+            background: "rgba(7,24,40,0.58)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
             border: "1px solid rgba(0,180,255,0.22)",
             borderRadius: 16,
             padding: 14,

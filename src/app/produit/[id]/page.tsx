@@ -14,6 +14,67 @@ function formatPrice(value: number) {
   return value.toLocaleString("fr-FR");
 }
 
+function ProductVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [soundOn, setSoundOn] = useState(false);
+
+  function toggleSound() {
+    const video = ref.current;
+    if (!video) return;
+
+    if (soundOn) {
+      video.muted = true;
+      setSoundOn(false);
+      return;
+    }
+
+    video.muted = false;
+    video.volume = 1;
+    video.play().catch(() => undefined);
+    setSoundOn(true);
+  }
+
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <video
+        ref={ref}
+        src={src}
+        autoPlay
+        muted
+        loop
+        playsInline
+        controls
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          display: "block",
+          background: "#000",
+        }}
+      />
+      <button
+        type="button"
+        onClick={toggleSound}
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          zIndex: 2,
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: "none",
+          background: "rgba(0,0,0,0.65)",
+          color: "#fff",
+          cursor: "pointer",
+          fontSize: 13,
+        }}
+      >
+        {soundOn ? "🔊 Son" : "🔇 Activer le son"}
+      </button>
+    </div>
+  );
+}
+
 export default function ProductDetailPage() {
   const params = useParams();
   const [product, setProduct] = useState<Product | null>(null);
@@ -24,9 +85,6 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [cartFlash, setCartFlash] = useState("");
   const [boutiqueId, setBoutiqueId] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaContainerRef = useRef<HTMLDivElement | null>(null);
-  const [mediaVisible, setMediaVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,39 +160,6 @@ export default function ProductDetailPage() {
 
   const mainMedia = gallery[galleryIndex] || gallery[0] || null;
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !mainMedia || mainMedia.type !== "video" || typeof IntersectionObserver === "undefined") {
-      return;
-    }
-
-    const container = mediaContainerRef.current;
-    const video = videoRef.current;
-    if (!container || !video) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setMediaVisible(entry.intersectionRatio >= 0.5);
-      },
-      { threshold: [0.5] }
-    );
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [mainMedia]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (mediaVisible) {
-      video.play().catch(() => {
-        /* autoplay blocked */
-      });
-    } else {
-      video.pause();
-    }
-  }, [mediaVisible]);
-
   function changeQty(delta: number) {
     setQty((current) => Math.max(1, current + delta));
   }
@@ -202,40 +227,32 @@ export default function ProductDetailPage() {
                 }}
               >
                 <div
-                  ref={mediaContainerRef}
                   style={{
-                    minHeight: 420,
-                    display: "grid",
-                    placeItems: "center",
-                    background: "linear-gradient(135deg, rgba(0, 40, 120, 0.2), rgba(0,8,16,0.95))",
+                    width: "100%",
+                    maxWidth: 560,
+                    aspectRatio: "4 / 5",
+                    margin: "0 auto",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    background: "#000",
+                    position: "relative",
                   }}
                 >
                   {mainMedia ? (
                     mainMedia.type === "video" ? (
-                      <video
-                        ref={videoRef}
-                        controls
-                        muted
-                        playsInline
-                        loop
-                        autoPlay
-                        preload="metadata"
-                        poster={product.images?.[0] ?? undefined}
-                        src={mainMedia.url}
-                        style={{ width: "100%", height: "100%", objectFit: "contain", maxHeight: 520, background: "#000" }}
-                      />
+                      <ProductVideo src={mainMedia.url} />
                     ) : (
                       <img
                         src={mainMedia.url}
                         alt={product.name}
-                        style={{ width: "100%", height: "100%", objectFit: "contain", maxHeight: 520 }}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                       />
                     )
                   ) : (
                     <div
                       style={{
                         width: "100%",
-                        height: 340,
+                        height: "100%",
                         display: "grid",
                         placeItems: "center",
                         background: "rgba(0,0,0,0.35)",

@@ -30,6 +30,12 @@ type Order = {
   has_charger?: boolean;
   livraison?: number;
   articles?: string;
+  boutiques?: {
+    id?: string | number;
+    nom?: string;
+    name?: string;
+    boutique_name?: string;
+  } | null;
 };
 
 function formatPrice(n: number) {
@@ -61,9 +67,17 @@ export default function AdminCommandesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("orders")
-      .select("*")
+      .select(`
+        *,
+        boutiques: boutique_id (
+          id,
+          nom,
+          name,
+          boutique_name
+        )
+      `)
       .order("created_at", { ascending: false });
-    setOrders(data || []);
+    setOrders((data as Order[]) || []);
     setLoading(false);
   }
 
@@ -253,6 +267,13 @@ export default function AdminCommandesPage() {
         const prix = o.prix || o.amount || o.total || 0;
         const st = statusMeta(o.status);
         const date = o.created_at ? new Date(o.created_at).toLocaleDateString("fr-FR") : "—";
+        const boutiqueNom =
+          o.boutiques?.nom ||
+          o.boutiques?.name ||
+          o.boutiques?.boutique_name ||
+          o.boutique_nom ||
+          o.boutique_id ||
+          "SDS PRO (catalogue)";
         const telClean = String(tel).replace(/\D/g, "");
         const wa = `https://wa.me/${telClean}?text=${encodeURIComponent(
           `Bonjour ${nom} 👋\nVotre commande SDS PRO est prête !\n📱 ${produit}\n📍 Livraison à : ${adr}\nMerci de votre confiance !`
@@ -293,6 +314,9 @@ export default function AdminCommandesPage() {
             <Row k="📞 Tél" v={tel} />
             <Row k="📍 Adresse" v={adr} />
             <Row k="📱 Produit" v={produit} />
+            <div style={{ fontSize: 12, color: "#7a9abb", marginBottom: 6 }}>
+              Boutique : <strong style={{ color: "#00c8ff" }}>{boutiqueNom}</strong>
+            </div>
             <Row k="💳 Paiement" v={o.paiement || o.operator || "PayDunya"} />
             <div style={{ display: "flex", gap: 6, marginBottom: 5, alignItems: "baseline" }}>
               <span style={{ fontSize: 10, color: "#4a7a9b", fontFamily: "DM Mono, monospace", minWidth: 70 }}>

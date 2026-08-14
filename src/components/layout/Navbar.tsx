@@ -11,8 +11,11 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [cartQty, setCartQty] = useState(0);
+  const [ordersPendingCount, setOrdersPendingCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
+  const isAdmin = pathname?.startsWith("/admin") ?? false;
+  const notifTotal = (cartQty || 0) + (ordersPendingCount || 0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -28,14 +31,31 @@ export default function Navbar() {
       );
     };
 
+    const syncPendingOrders = async (userId?: string) => {
+      if (!userId) {
+        setOrdersPendingCount(0);
+        return;
+      }
+
+      const { count, error } = await supabase
+        .from("orders")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("status", "en_attente");
+
+      if (!error) setOrdersPendingCount(count || 0);
+    };
+
     supabase.auth.getUser().then(({ data }) => {
       setDisplayName(getNameFromUser(data.user));
+      syncPendingOrders(data.user?.id);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setDisplayName(getNameFromUser(session?.user));
+      syncPendingOrders(session?.user?.id);
     });
 
     return () => subscription.unsubscribe();
@@ -76,6 +96,8 @@ export default function Navbar() {
     closeMenus();
   }, [pathname]);
 
+  if (isAdmin) return null;
+
   return (
     <>
       <nav
@@ -111,7 +133,9 @@ export default function Navbar() {
           {/* Hamburger */}
           <button
             onClick={() => setDrawerOpen((open) => !open)}
+            aria-label="Menu"
             style={{
+              position: "relative",
               background: "none",
               border: "none",
               cursor: "pointer",
@@ -124,6 +148,29 @@ export default function Navbar() {
             <span style={{ display: "block", width: 22, height: 2, background: "#00c8ff", borderRadius: 2 }} />
             <span style={{ display: "block", width: 22, height: 2, background: "#00c8ff", borderRadius: 2 }} />
             <span style={{ display: "block", width: 22, height: 2, background: "#00c8ff", borderRadius: 2 }} />
+            {notifTotal > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -6,
+                  minWidth: 16,
+                  height: 16,
+                  padding: "0 4px",
+                  borderRadius: 99,
+                  background: "#e11d48",
+                  color: "#fff",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                }}
+              >
+                {notifTotal > 99 ? "99+" : notifTotal}
+              </span>
+            )}
           </button>
 
           {/* Logo */}
@@ -138,60 +185,6 @@ export default function Navbar() {
             >
               <span style={{ color: "#00e5ff" }}>SDS</span>
               <span style={{ color: "#fff", marginLeft: 6 }}>PRO</span>
-            </span>
-          </Link>
-
-          <Link
-            href="/mes-commandes"
-            style={{
-              color: "#00c8ff",
-              textDecoration: "none",
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "8px 12px",
-              border: "1px solid rgba(0,200,255,0.35)",
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-            title="Mes commandes"
-          >
-            📦 Mes commandes
-          </Link>
-          <Link
-            href="/panier"
-            style={{
-              color: "#00c8ff",
-              textDecoration: "none",
-              fontSize: 13,
-              fontWeight: 600,
-              padding: "8px 12px",
-              border: "1px solid rgba(0,200,255,0.35)",
-              borderRadius: 8,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-            title="Panier"
-          >
-            🛒 Panier
-            <span
-              style={{
-                minWidth: 18,
-                height: 18,
-                borderRadius: 100,
-                padding: "0 5px",
-                background: cartQty > 0 ? "#00c8ff" : "rgba(122,154,187,0.35)",
-                color: cartQty > 0 ? "#03203a" : "#d0e3f5",
-                fontSize: 11,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {cartQty}
             </span>
           </Link>
 
@@ -308,10 +301,16 @@ export default function Navbar() {
           📱 Catalogue
         </Link>
         <Link href="/mes-commandes" onClick={() => setDrawerOpen(false)} style={drawerLink}>
-          📦 Mes commandes
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            📦 Mes commandes
+            <Badge n={ordersPendingCount} />
+          </span>
         </Link>
         <Link href="/panier" onClick={() => setDrawerOpen(false)} style={drawerLink}>
-          🛒 Panier ({cartQty})
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            🛒 Panier
+            <Badge n={cartQty} />
+          </span>
         </Link>
         <Link href="/accessoires" onClick={() => setDrawerOpen(false)} style={drawerLink}>
           🎧 Accessoires
@@ -351,6 +350,30 @@ export default function Navbar() {
         )}
       </div>
     </>
+  );
+}
+
+function Badge({ n }: { n: number }) {
+  if (!n || n <= 0) return null;
+  return (
+    <span
+      style={{
+        minWidth: 18,
+        height: 18,
+        padding: "0 6px",
+        borderRadius: 99,
+        background: "#e11d48",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        lineHeight: 1,
+      }}
+    >
+      {n > 99 ? "99+" : n}
+    </span>
   );
 }
 

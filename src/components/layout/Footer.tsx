@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LegalIds from "@/components/LegalIds";
 
 export default function Footer() {
   return (
@@ -40,11 +41,20 @@ export default function Footer() {
               fontSize: 13,
               color: "#7a9abb",
               lineHeight: 1.7,
-              maxWidth: 270,
+              maxWidth: 290,
             }}
           >
-            Votre boutique smartphones premium à Dakar. iPhones, Samsung,
-            Huawei, Infinix, Tecno au meilleur prix.
+            <strong style={{ color: "#eaf7ff" }}>
+              <span style={{ color: "#fff" }}>SECK</span>{" "}
+              <span style={{ color: "#00c8ff" }}>DIGITAL</span>{" "}
+              <span style={{ color: "#fff" }}>SERVICES</span>{" "}
+              <span style={{ color: "#00c8ff" }}>PRO</span>{" "}
+              (SDS PRO)
+            </strong>
+            <br />
+            Commerce général, accessoires téléphoniques, vente en ligne et dépannage.
+            <br />
+            MDM &amp; crédit phone pour boutiques partenaires.
           </p>
           <div
             style={{
@@ -54,13 +64,9 @@ export default function Footer() {
               marginTop: 12,
             }}
           >
-            <strong style={{ color: "#bdd4ea" }}>SECK DIGITAL SERVICES PRO</strong>
-            <br />
             Petit Mbao, Cité Ville Neuve, Villa N199 · Pikine, Dakar
             <br />
-            NINEA : 013038395 · RCCM : SN DKR 2026 A 16899
-            <br />
-            D-U-N-S : 669805885
+            <LegalIds style={{ fontSize: 12, color: "#7a9abb" }} />
             <br />
             📞 77 069 97 39 · contact@sdsprotech.com
           </div>
@@ -140,7 +146,12 @@ export default function Footer() {
           color: "#7a9abb",
         }}
       >
-        <span>© 2026 SECK DIGITAL SERVICES PRO</span>
+        <span>
+          © 2026 <span style={{ color: "#fff" }}>SECK</span>{" "}
+          <span style={{ color: "#00c8ff" }}>DIGITAL</span>{" "}
+          <span style={{ color: "#fff" }}>SERVICES</span>{" "}
+          <span style={{ color: "#00c8ff" }}>PRO</span>
+        </span>
         <span>GÉRANT : SOULEYMANE SECK</span>
       </div>
     </footer>

@@ -147,7 +147,9 @@ export default function Portail() {
             marginBottom: 9,
           }}
         >
-          SECK <span style={{ color: "#00c8ff" }}>DIGITAL</span> SERVICES{" "}
+          <span style={{ color: "#fff" }}>SECK</span>{" "}
+          <span style={{ color: "#00c8ff" }}>DIGITAL</span>{" "}
+          <span style={{ color: "#fff" }}>SERVICES</span>{" "}
           <span style={{ color: "#00c8ff" }}>PRO</span>
         </div>
 
