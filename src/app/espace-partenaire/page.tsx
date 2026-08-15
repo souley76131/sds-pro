@@ -4,6 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
+const CONDITIONS_PARTENAIRE = `CONDITIONS PARTENAIRE SDS PRO
+
+1. SDS PRO fournit la plateforme (vitrine, commandes, crédit échelonné, sécurisation MDM).
+2. La boutique reste propriétaire de sa marge sur la vente des appareils.
+3. Frais de sécurisation MDM : 10 000 FCFA par appareil en crédit, payés par le client avec l'acompte.
+4. Commission service SDS PRO : 7 500 FCFA par dossier de crédit validé (appareil enrôlé avec ID MDM).
+5. Aucun dossier n'est validé sans identifiant MDM (device_id). Sans ID, pas de verrouillage possible.
+6. En cas d'impayé à l'échéance, l'appareil peut être verrouillé à distance. Après paiement, il est déverrouillé.
+7. Les produits, photos et vidéos publiés par la boutique sont soumis à validation SDS PRO avant mise en ligne.
+8. La boutique s'engage à des informations exactes (prix, stock, contact) et à un traitement correct des clients.
+9. SDS PRO peut suspendre l'accès en cas de fraude, abus ou non-respect de ces règles.
+
+En cochant « J'accepte », vous confirmez avoir lu et accepté ces conditions.`;
+
 type Boutique = {
   id: string;
   nom: string;
@@ -47,6 +61,7 @@ export default function EspacePartenairePage() {
   const [quartier, setQuartier] = useState("");
   const [payout, setPayout] = useState("");
   const [merci, setMerci] = useState(false);
+  const [accepteConditions, setAccepteConditions] = useState(false);
 
   const [stats, setStats] = useState({ ca: 0, attente: 0, cmd: 0 });
 
@@ -196,9 +211,13 @@ export default function EspacePartenairePage() {
       setError("Nom, gérant et téléphone sont requis.");
       return;
     }
+    if (!accepteConditions) {
+      setError("Vous devez accepter les conditions partenaire pour continuer.");
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
-    const { error: err } = await supabase.rpc("rpc_inscription_partenaire", {
+    const { data: newBoutiqueId, error: err } = await supabase.rpc("rpc_inscription_partenaire", {
       p_nom: nom,
       p_proprietaire: prop,
       p_telephone: tel,
@@ -211,6 +230,19 @@ export default function EspacePartenairePage() {
     if (err) {
       setError("Erreur : " + err.message);
       return;
+    }
+    // Best-effort: record acceptance timestamp if the RPC handed back an id.
+    // Doesn't block the signup flow either way — the checkbox gate above is
+    // what actually enforces acceptance.
+    if (newBoutiqueId) {
+      try {
+        await supabase
+          .from("boutiques")
+          .update({ conditions_acceptees_at: new Date().toISOString() })
+          .eq("id", newBoutiqueId as any);
+      } catch {
+        // ignore
+      }
     }
     setMerci(true);
   }
@@ -794,7 +826,38 @@ export default function EspacePartenairePage() {
               <Field label="Ville"><input value={ville} onChange={(e) => setVille(e.target.value)} style={inputStyle} /></Field>
               <Field label="Quartier"><input value={quartier} onChange={(e) => setQuartier(e.target.value)} style={inputStyle} /></Field>
               <Field label="Numéro versements (Wave / OM)"><input value={payout} onChange={(e) => setPayout(e.target.value)} style={inputStyle} /></Field>
-              <button onClick={creerBoutique} disabled={loading} style={btnStyle}>{loading ? "Création…" : "Créer ma boutique"}</button>
+
+              <div
+                style={{
+                  maxHeight: 180,
+                  overflowY: "auto",
+                  padding: 12,
+                  borderRadius: 10,
+                  border: "1px solid rgba(0,180,255,0.22)",
+                  background: "rgba(0,20,40,0.4)",
+                  color: "#9eb6d0",
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-wrap",
+                  marginBottom: 12,
+                }}
+              >
+                {CONDITIONS_PARTENAIRE}
+              </div>
+
+              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "#c8dff5", marginBottom: 16, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={accepteConditions}
+                  onChange={(e) => setAccepteConditions(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>J&apos;accepte les conditions partenaire SDS PRO (MDM 10 000 F · commission 7 500 F / dossier validé).</span>
+              </label>
+
+              <button onClick={creerBoutique} disabled={loading || !accepteConditions} style={{ ...btnStyle, opacity: loading || !accepteConditions ? 0.6 : 1, cursor: loading || !accepteConditions ? "not-allowed" : "pointer" }}>
+                {loading ? "Création…" : "Créer ma boutique"}
+              </button>
               {error && <p style={errStyle}>{error}</p>}
             </>
           ) : (
