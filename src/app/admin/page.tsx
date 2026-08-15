@@ -20,7 +20,26 @@ export default function AdminDashboardPage() {
   });
   const [recent, setRecent] = useState<any[]>([]);
   const [pendingProducts, setPendingProducts] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [marquantLu, setMarquantLu] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  async function chargerNotifications() {
+    const { data } = await supabase
+      .from("notifications")
+      .select("id, titre, message, type, lu, created_at")
+      .eq("pour_admin", true)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setNotifications(data || []);
+  }
+
+  async function marquerToutLu() {
+    setMarquantLu(true);
+    await supabase.from("notifications").update({ lu: true }).eq("pour_admin", true).eq("lu", false);
+    await chargerNotifications();
+    setMarquantLu(false);
+  }
 
   useEffect(() => {
     (async () => {
@@ -38,6 +57,7 @@ export default function AdminDashboardPage() {
       const products = productsRes.data || [];
       const monthOrders = monthRes.data || [];
       setPendingProducts(pendingRes.count || 0);
+      await chargerNotifications();
 
       const emails = [...new Set(orders.map((o: any) => o.user_email).filter(Boolean))];
       const total = orders.reduce((s: number, o: any) => s + (o.prix || o.price || o.total || o.amount || 0), 0);
@@ -112,6 +132,67 @@ export default function AdminDashboardPage() {
           </div>
           <span style={{ color: "#ffb020", fontSize: 20 }}>→</span>
         </Link>
+      )}
+
+      {notifications.length > 0 && (
+        <div
+          style={{
+            background: "#0a1f35",
+            border: "1px solid rgba(0,180,255,0.18)",
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 24,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12 }}>
+            <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 16, fontWeight: 700 }}>
+              🔔 Notifications
+            </div>
+            {notifications.some((n) => !n.lu) && (
+              <button
+                type="button"
+                onClick={marquerToutLu}
+                disabled={marquantLu}
+                style={{
+                  background: "rgba(0,180,255,0.1)",
+                  border: "1px solid rgba(0,180,255,0.3)",
+                  color: "#6ab0ff",
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: marquantLu ? 0.6 : 1,
+                }}
+              >
+                {marquantLu ? "…" : "Tout marquer lu"}
+              </button>
+            )}
+          </div>
+
+          {notifications.slice(0, 10).map((n) => (
+            <div
+              key={n.id}
+              style={{
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+                padding: "10px 0",
+                borderTop: "1px solid rgba(0,180,255,0.1)",
+                opacity: n.lu ? 0.55 : 1,
+              }}
+            >
+              <span style={{ marginTop: 2, width: 7, height: 7, borderRadius: "50%", background: n.lu ? "transparent" : "#e11d48", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{n.titre}</div>
+                <div style={{ fontSize: 12, color: "#7a9abb", marginTop: 2 }}>{n.message}</div>
+                <div style={{ fontSize: 10, color: "#4a7a9b", marginTop: 3, fontFamily: "DM Mono, monospace" }}>
+                  {n.created_at ? new Date(n.created_at).toLocaleString("fr-FR") : ""}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>

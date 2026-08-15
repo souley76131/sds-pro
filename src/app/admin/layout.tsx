@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const supabase = createClient();
   const [ready, setReady] = useState(false);
   const [name, setName] = useState("Admin");
-  const [pendingProducts, setPendingProducts] = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const isLogin = pathname === "/admin/login";
 
@@ -58,10 +58,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setReady(true);
 
       const { count } = await supabase
-        .from("products")
+        .from("notifications")
         .select("*", { count: "exact", head: true })
-        .eq("moderation_status", "pending");
-      setPendingProducts(count || 0);
+        .eq("pour_admin", true)
+        .eq("lu", false);
+      setUnreadNotifications(count || 0);
     })();
   }, [pathname, isLogin, router, supabase]);
 
@@ -149,7 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {TABS.map((t) => {
           const on = pathname === t.href;
-          const badge = t.href === "/admin/produits" ? pendingProducts : 0;
+          const badge = t.href === "/admin/produits" ? unreadNotifications : 0;
           return (
             <Link
               key={t.href}

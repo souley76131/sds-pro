@@ -616,6 +616,24 @@ export default function EspacePartenairePage() {
     return data.publicUrl;
   }
 
+  async function notifierAdminModeration(nomProduit: string, productId: string | number | null) {
+    try {
+      const supabase = createClient();
+      const ref = productId ? ` (id ${productId})` : "";
+      await supabase.from("notifications").insert({
+        pour_admin: true,
+        user_id: null,
+        dossier_id: null,
+        titre: "Produit en attente de validation",
+        message: `${nomProduit || "Produit"}${ref} — à modérer sur /admin/produits.`,
+        type: "moderation",
+        lu: false,
+      });
+    } catch {
+      // ne bloque pas le flux d'ajout/modification du produit
+    }
+  }
+
   async function sauverProduit() {
     setProdErr("");
     if (!pNom.trim()) { setProdErr("Le nom est requis."); return; }
@@ -662,12 +680,15 @@ export default function EspacePartenairePage() {
         if (urlVideo) maj.video_url = urlVideo;
         const { error: err } = await supabase.from("products").update(maj).eq("id", editId).eq("boutique_id", boutique.id);
         if (err) throw err;
+        await notifierAdminModeration(pNom.trim(), editId);
       } else {
-        const { error: err } = await supabase.rpc("rpc_soumettre_produit", {
+        const { data: rpcData, error: err } = await supabase.rpc("rpc_soumettre_produit", {
           p_nom: pNom.trim(), p_prix: prix, p_modele: pModele.trim() || null, p_description: pSpecs.trim() || null,
           p_categorie: categorie, p_images: urlsPhotos, p_video_url: urlVideo, p_emoji: pEmoji.trim() || "📱", p_marque: pMarque,
         });
         if (err) throw err;
+        const newId = typeof rpcData === "object" && rpcData !== null ? (rpcData as any).id ?? null : rpcData ?? null;
+        await notifierAdminModeration(pNom.trim(), newId);
       }
       setShowModal(false);
       alert(
