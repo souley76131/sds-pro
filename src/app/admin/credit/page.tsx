@@ -29,6 +29,21 @@ type Dossier = {
   doc_residence?: string;
 };
 
+async function getDocUrl(pathOrUrl?: string | null): Promise<string | null> {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith("http")) return pathOrUrl;
+
+  const supabase = createClient();
+  const path = pathOrUrl.replace(/^\/+/, "");
+  const { data, error } = await supabase.storage.from("credit-docs").createSignedUrl(path, 3600);
+
+  if (error) {
+    console.error("credit-docs signedUrl", path, error.message);
+    return null;
+  }
+  return data.signedUrl;
+}
+
 function formatPrice(n: number) {
   return Number(n || 0).toLocaleString("fr-FR");
 }
@@ -50,6 +65,35 @@ export default function AdminCreditPage() {
   const [toast, setToast] = useState("");
   const [selected, setSelected] = useState<Dossier | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [docUrls, setDocUrls] = useState<Record<string, string | null>>({});
+  const [docsLoading, setDocsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selected) {
+      setDocUrls({});
+      return;
+    }
+    let cancelled = false;
+    setDocsLoading(true);
+    (async () => {
+      const entries = await Promise.all(
+        (
+          [
+            ["cni", selected.doc_cni],
+            ["verso", selected.doc_cni_verso],
+            ["selfie", selected.doc_selfie],
+            ["residence", selected.doc_residence],
+          ] as const
+        ).map(async ([k, v]) => [k, await getDocUrl(v)] as const)
+      );
+      if (cancelled) return;
+      setDocUrls(Object.fromEntries(entries));
+      setDocsLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected?.dossier_id]);
 
   function showToast(msg: string) {
     setToast(msg);
@@ -332,10 +376,10 @@ export default function AdminCreditPage() {
                   N° CNI : {selected.numero_cni}
                 </div>
               )}
-              <DocLink label="CNI recto" value={selected.doc_cni} />
-              <DocLink label="CNI verso" value={selected.doc_cni_verso} />
-              <DocLink label="Selfie" value={selected.doc_selfie} />
-              <DocLink label="Résidence" value={selected.doc_residence} />
+              <DocLink label="CNI recto" raw={selected.doc_cni} url={docUrls.cni} loading={docsLoading} />
+              <DocLink label="CNI verso" raw={selected.doc_cni_verso} url={docUrls.verso} loading={docsLoading} />
+              <DocLink label="Selfie" raw={selected.doc_selfie} url={docUrls.selfie} loading={docsLoading} />
+              <DocLink label="Résidence" raw={selected.doc_residence} url={docUrls.residence} loading={docsLoading} />
             </div>
 
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
@@ -391,12 +435,16 @@ export default function AdminCreditPage() {
 
 function DocLink({
   label,
-  value,
+  raw,
+  url,
+  loading,
 }: {
   label: string;
-  value?: string | null;
+  raw?: string | null;
+  url?: string | null;
+  loading?: boolean;
 }) {
-  if (!value) {
+  if (!raw) {
     return (
       <div style={{ fontSize: 13, color: "#7a9abb", marginBottom: 8 }}>
         {label} : <em>non fourni</em>
@@ -404,9 +452,21 @@ function DocLink({
     );
   }
 
-  const url = value.startsWith("http")
-    ? value
-    : `https://fvfkawxwtsziqzibzbxt.supabase.co/storage/v1/object/public/credit-docs/${value.replace(/^\//, "")}`;
+  if (loading) {
+    return (
+      <div style={{ fontSize: 13, color: "#7a9abb", marginBottom: 8 }}>
+        {label} : chargement…
+      </div>
+    );
+  }
+
+  if (!url) {
+    return (
+      <div style={{ fontSize: 13, color: "#f87171", marginBottom: 8 }}>
+        {label} : <em>échec de chargement — bucket ou chemin invalide ({raw.slice(0, 40)}{raw.length > 40 ? "…" : ""})</em>
+      </div>
+    );
+  }
 
   const isImg = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
 
