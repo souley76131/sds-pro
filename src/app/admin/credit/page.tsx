@@ -27,22 +27,10 @@ type Dossier = {
   doc_cni_verso?: string;
   doc_selfie?: string;
   doc_residence?: string;
+  device_id?: string;
 };
 
-async function getDocUrl(pathOrUrl?: string | null): Promise<string | null> {
-  if (!pathOrUrl) return null;
-  if (pathOrUrl.startsWith("http")) return pathOrUrl;
-
-  const supabase = createClient();
-  const path = pathOrUrl.replace(/^\/+/, "");
-  const { data, error } = await supabase.storage.from("credit-docs").createSignedUrl(path, 3600);
-
-  if (error) {
-    console.error("credit-docs signedUrl", path, error.message);
-    return null;
-  }
-  return data.signedUrl;
-}
+const BACKEND = "https://sdsprotech-backend.pages.dev";
 
 function formatPrice(n: number) {
   return Number(n || 0).toLocaleString("fr-FR");
@@ -67,6 +55,17 @@ export default function AdminCreditPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [docUrls, setDocUrls] = useState<Record<string, string | null>>({});
   const [docsLoading, setDocsLoading] = useState(false);
+  const [deviceIdInput, setDeviceIdInput] = useState("");
+
+  function openDetail(d: Dossier) {
+    setSelected(d);
+    setDeviceIdInput(d.device_id || "");
+  }
+
+  async function getAccessToken(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  }
 
   useEffect(() => {
     if (!selected) {
@@ -74,22 +73,55 @@ export default function AdminCreditPage() {
       return;
     }
     let cancelled = false;
+
+    const fields: [string, string | undefined][] = [
+      ["cni", selected.doc_cni],
+      ["verso", selected.doc_cni_verso],
+      ["selfie", selected.doc_selfie],
+      ["residence", selected.doc_residence],
+    ];
+    const present = fields.filter((f): f is [string, string] => !!f[1]);
+    if (!present.length) {
+      setDocUrls({});
+      return;
+    }
+
     setDocsLoading(true);
     (async () => {
-      const entries = await Promise.all(
-        (
-          [
-            ["cni", selected.doc_cni],
-            ["verso", selected.doc_cni_verso],
-            ["selfie", selected.doc_selfie],
-            ["residence", selected.doc_residence],
-          ] as const
-        ).map(async ([k, v]) => [k, await getDocUrl(v)] as const)
-      );
-      if (cancelled) return;
-      setDocUrls(Object.fromEntries(entries));
-      setDocsLoading(false);
+      const token = await getAccessToken();
+      if (!token) {
+        if (!cancelled) {
+          setDocUrls({});
+          setDocsLoading(false);
+        }
+        return;
+      }
+      try {
+        const res = await fetch(`${BACKEND}/credit-doc-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ access_token: token, paths: present.map(([, p]) => p) }),
+        });
+        const json: any = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || `Erreur (${res.status})`);
+        const byPath: Record<string, string> = {};
+        (json.urls || []).forEach((u: any) => {
+          if (u?.path && u?.url) byPath[u.path] = u.url;
+        });
+        if (cancelled) return;
+        const next: Record<string, string | null> = {};
+        present.forEach(([key, path]) => {
+          next[key] = byPath[path] || null;
+        });
+        setDocUrls(next);
+      } catch (e: any) {
+        console.error("credit-doc-url", e.message || e);
+        if (!cancelled) setDocUrls({});
+      } finally {
+        if (!cancelled) setDocsLoading(false);
+      }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -115,34 +147,83 @@ export default function AdminCreditPage() {
     load();
   }, []);
 
-  async function adminAction(dossier_id: string, action: "valider" | "refuser" | "livre") {
+  // valider/refuser/verrouiller/deverrouiller all go through credit-admin-action —
+  // confirmed live: it 401s with "token manquant" / "token invalide" depending on
+  // whether access_token is present/valid, so it really checks the session. No
+  // silent fallback to a direct DB write here anymore: that fallback is what let
+  // dossiers get marked "valide" in the past without ever recording a device_id or
+  // actually touching SimpleMDM, which is the bug this fixes.
+  async function adminAction(
+    dossier_id: string,
+    action: "valider" | "refuser" | "verrouiller" | "deverrouiller"
+  ) {
+    let device_id: string | undefined;
+    let motif: string | undefined;
+
+    if (action === "valider") {
+      device_id = deviceIdInput.trim();
+      if (!device_id) {
+        showToast("⚠️ Renseignez l'ID appareil (device_id) avant de valider.");
+        return;
+      }
+      const ok = window.confirm(
+        `Confirmer la validation ?\n\nDevice ID : ${device_id}\n\nVeuillez vérifier l'ID avant de valider.`
+      );
+      if (!ok) return;
+    }
+
+    if (action === "refuser") {
+      motif = window.prompt("Motif du refus (optionnel) :") || undefined;
+    }
+
     setActionLoading(true);
     try {
-      // Prefer backend if available
-      const res = await fetch("https://sdsprotech-backend.pages.dev/credit-admin-action", {
+      const token = await getAccessToken();
+      if (!token) throw new Error("Session admin expirée — reconnectez-vous.");
+
+      const body: Record<string, any> = { dossier_id, action, access_token: token };
+      if (device_id) body.device_id = device_id;
+      if (motif) body.motif = motif;
+
+      const res = await fetch(`${BACKEND}/credit-admin-action`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dossier_id, action }),
+        body: JSON.stringify(body),
       });
       const json: any = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        // fallback direct DB
-        const map: Record<string, string> = {
-          valider: "valide",
-          refuser: "refuse",
-          livre: "livre",
-        };
-        const { error } = await supabase
-          .from("credit_phones")
-          .update({ statut_compte: map[action] })
-          .eq("dossier_id", dossier_id);
-        if (error) throw error;
-      } else if (json && json.error) {
-        throw new Error(json.error);
+      if (!res.ok || json?.error) {
+        throw new Error(json.error || `Erreur (${res.status})`);
       }
+
       showToast(
-        action === "valider" ? "✅ Dossier validé" : action === "refuser" ? "❌ Dossier refusé" : "📦 Marqué livré"
+        action === "valider"
+          ? "✅ Dossier validé"
+          : action === "refuser"
+          ? "❌ Dossier refusé"
+          : action === "verrouiller"
+          ? "🔒 Appareil verrouillé"
+          : "🔓 Appareil déverrouillé"
       );
+      setSelected(null);
+      load();
+    } catch (e: any) {
+      showToast("Erreur : " + (e.message || "action impossible"));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  // Marquage "livré" reste une simple mise à jour directe : pas dans le contrat
+  // credit-admin-action décrit côté backend, et sans implication SimpleMDM.
+  async function marquerLivre(dossier_id: string) {
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("credit_phones")
+        .update({ statut_compte: "livre" })
+        .eq("dossier_id", dossier_id);
+      if (error) throw error;
+      showToast("📦 Marqué livré");
       setSelected(null);
       load();
     } catch (e: any) {
@@ -265,16 +346,13 @@ export default function AdminCreditPage() {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Btn onClick={() => setSelected(d)} color="#6ab0ff">
-                👁 Détail
-              </Btn>
-              <Btn onClick={() => adminAction(d.dossier_id, "valider")} color="#00e676">
-                ✅ Valider
+              <Btn onClick={() => openDetail(d)} color="#6ab0ff">
+                👁 Détail / Valider
               </Btn>
               <Btn onClick={() => adminAction(d.dossier_id, "refuser")} color="#ff4444">
                 ❌ Refuser
               </Btn>
-              <Btn onClick={() => adminAction(d.dossier_id, "livre")} color="#00e5ff">
+              <Btn onClick={() => marquerLivre(d.dossier_id)} color="#00e5ff">
                 📦 Livré
               </Btn>
             </div>
@@ -382,11 +460,77 @@ export default function AdminCreditPage() {
               <DocLink label="Résidence" raw={selected.doc_residence} url={docUrls.residence} loading={docsLoading} />
             </div>
 
+            <div style={{ marginTop: 14, marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 12, color: "#9eb6d0", marginBottom: 6 }}>
+                ID appareil (SimpleMDM / device_id) <span style={{ color: "#f87171" }}>*</span>
+              </label>
+              <input
+                value={deviceIdInput}
+                onChange={(e) => setDeviceIdInput(e.target.value)}
+                placeholder="device_id SimpleMDM"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(0,180,255,0.35)",
+                  background: "rgba(0,0,0,0.35)",
+                  color: "#fff",
+                  fontSize: 14,
+                  boxSizing: "border-box",
+                }}
+              />
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#ff9100" }}>
+                Requis pour valider — vérifiez l&apos;ID avant de confirmer. Revalider un dossier déjà validé met aussi à jour le device_id enregistré.
+              </p>
+            </div>
+
+            <div style={{ marginTop: 14, marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => adminAction(selected.dossier_id, "verrouiller")}
+                  disabled={actionLoading}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #f87171",
+                    background: "rgba(248,113,113,0.15)",
+                    color: "#f87171",
+                    fontWeight: 600,
+                    cursor: actionLoading ? "not-allowed" : "pointer",
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  🔒 Verrouiller
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adminAction(selected.dossier_id, "deverrouiller")}
+                  disabled={actionLoading}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #00c864",
+                    background: "rgba(0,200,100,0.15)",
+                    color: "#00c864",
+                    fontWeight: 600,
+                    cursor: actionLoading ? "not-allowed" : "pointer",
+                    opacity: actionLoading ? 0.6 : 1,
+                  }}
+                >
+                  🔓 Déverrouiller
+                </button>
+              </div>
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#7a9abb" }}>
+                Verrouillage/déverrouillage réel via SimpleMDM (credit-admin-action). Le device_id enregistré en base est utilisé côté backend.
+              </p>
+            </div>
+
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
               <Btn
                 onClick={() => adminAction(selected.dossier_id, "valider")}
                 color="#00e676"
-                disabled={actionLoading}
+                disabled={actionLoading || !deviceIdInput.trim()}
               >
                 ✅ Valider
               </Btn>
@@ -398,7 +542,7 @@ export default function AdminCreditPage() {
                 ❌ Refuser
               </Btn>
               <Btn
-                onClick={() => adminAction(selected.dossier_id, "livre")}
+                onClick={() => marquerLivre(selected.dossier_id)}
                 color="#00e5ff"
                 disabled={actionLoading}
               >
