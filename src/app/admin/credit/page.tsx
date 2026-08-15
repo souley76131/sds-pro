@@ -23,11 +23,10 @@ type Dossier = {
   statut_compte?: string;
   boutique_id?: string;
   created_at?: string;
-  doc_cni_recto?: string;
+  doc_cni?: string;
   doc_cni_verso?: string;
   doc_selfie?: string;
   doc_residence?: string;
-  doc_cni_legalisee?: string;
 };
 
 function formatPrice(n: number) {
@@ -323,6 +322,22 @@ export default function AdminCreditPage() {
               );
             })}
 
+            {/* Documents client */}
+            <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,180,255,0.2)", paddingTop: 12 }}>
+              <div style={{ fontWeight: 600, color: "#00c8ff", marginBottom: 10 }}>
+                Documents
+              </div>
+              {selected.numero_cni && (
+                <div style={{ fontSize: 13, color: "#9eb6d0", marginBottom: 8 }}>
+                  N° CNI : {selected.numero_cni}
+                </div>
+              )}
+              <DocLink label="CNI recto" value={selected.doc_cni} />
+              <DocLink label="CNI verso" value={selected.doc_cni_verso} />
+              <DocLink label="Selfie" value={selected.doc_selfie} />
+              <DocLink label="Résidence" value={selected.doc_residence} />
+            </div>
+
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
               <Btn
                 onClick={() => adminAction(selected.dossier_id, "valider")}
@@ -369,6 +384,52 @@ export default function AdminCreditPage() {
         >
           {toast}
         </div>
+      )}
+    </div>
+  );
+}
+
+function DocLink({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  if (!value) {
+    return (
+      <div style={{ fontSize: 13, color: "#7a9abb", marginBottom: 8 }}>
+        {label} : <em>non fourni</em>
+      </div>
+    );
+  }
+
+  const url = value.startsWith("http")
+    ? value
+    : `https://fvfkawxwtsziqzibzbxt.supabase.co/storage/v1/object/public/credit-docs/${value.replace(/^\//, "")}`;
+
+  const isImg = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: "#9eb6d0", marginBottom: 6 }}>{label}</div>
+      {isImg ? (
+        <a href={url} target="_blank" rel="noreferrer">
+          <img
+            src={url}
+            alt={label}
+            style={{
+              maxWidth: "100%",
+              maxHeight: 160,
+              borderRadius: 8,
+              border: "1px solid rgba(0,180,255,0.25)",
+            }}
+          />
+        </a>
+      ) : (
+        <a href={url} target="_blank" rel="noreferrer" style={{ color: "#00c8ff", fontSize: 13 }}>
+          Ouvrir →
+        </a>
       )}
     </div>
   );
