@@ -56,6 +56,7 @@ export default function AdminCreditPage() {
   const [docUrls, setDocUrls] = useState<Record<string, string | null>>({});
   const [docsLoading, setDocsLoading] = useState(false);
   const [deviceIdInput, setDeviceIdInput] = useState("");
+  const [boutiqueNames, setBoutiqueNames] = useState<Record<string, string>>({});
 
   function openDetail(d: Dossier) {
     setSelected(d);
@@ -141,6 +142,17 @@ export default function AdminCreditPage() {
     if (error) showToast("Erreur : " + error.message);
     setRows(data || []);
     setLoading(false);
+
+    // Résolution groupée des noms de boutiques (évite une requête par dossier)
+    const ids = [...new Set((data || []).map((d) => d.boutique_id).filter(Boolean))] as string[];
+    if (ids.length) {
+      const { data: boutiques } = await supabase.from("boutiques").select("id, nom").in("id", ids);
+      const map: Record<string, string> = {};
+      (boutiques || []).forEach((b: any) => {
+        if (b.nom) map[b.id] = b.nom;
+      });
+      setBoutiqueNames(map);
+    }
   }
 
   useEffect(() => {
@@ -336,7 +348,9 @@ export default function AdminCreditPage() {
             <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📞 {d.client_tel || "—"}</div>
             <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📱 {d.appareil || "—"}</div>
             {d.boutique_id && (
-              <div style={{ fontSize: 12, color: "#00e5ff", marginBottom: 2 }}>🏪 Boutique : {d.boutique_id}</div>
+              <div style={{ fontSize: 12, color: "#00e5ff", marginBottom: 2 }}>
+                🏪 Boutique : {boutiqueNames[d.boutique_id] || d.boutique_id}
+              </div>
             )}
             <div style={{ fontSize: 12, color: "#4a7a9b", marginBottom: 8 }}>
               Versements payés : {paid}/4
@@ -414,7 +428,10 @@ export default function AdminCreditPage() {
             <Line k="Adresse" v={selected.client_adresse || "—"} />
             <Line k="CNI" v={selected.numero_cni || "—"} />
             <Line k="Appareil" v={selected.appareil || "—"} />
-            <Line k="Boutique" v={selected.boutique_id || "SDS PRO"} />
+            <Line
+              k="Boutique"
+              v={(selected.boutique_id && boutiqueNames[selected.boutique_id]) || selected.boutique_id || "SDS PRO"}
+            />
             <Line k="Prix total" v={`${formatPrice(selected.prix_total || 0)} FCFA`} />
 
             <div style={{ marginTop: 12, marginBottom: 8, fontSize: 11, color: "#4a7a9b", fontFamily: "DM Mono, monospace" }}>
