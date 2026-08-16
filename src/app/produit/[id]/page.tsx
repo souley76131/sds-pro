@@ -316,7 +316,11 @@ export default function ProductDetailPage() {
                 }}
               >
                 <div
-                  onClick={() => setFullscreenMedia((current) => (current ? null : mainMedia))}
+                  onClick={() => {
+                    if (mainMedia?.type === "image") {
+                      setFullscreenMedia((current) => (current ? null : mainMedia));
+                    }
+                  }}
                   style={{
                     width: "100%",
                     maxWidth: 760,
@@ -326,7 +330,7 @@ export default function ProductDetailPage() {
                     overflow: "hidden",
                     background: "#000",
                     position: "relative",
-                    cursor: "pointer",
+                    cursor: mainMedia?.type === "image" ? "pointer" : "default",
                   }}
                 >
                   {mainMedia ? (
