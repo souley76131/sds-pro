@@ -190,6 +190,11 @@ export default function AdminPartenairesPage() {
 
   const caBoutique = orders.reduce((s, o) => s + (o.prix || o.amount || o.total || 0), 0);
 
+  const nbDemandes = rows.filter((b) => {
+    const st = (b.statut || b.status || "en_attente").toLowerCase();
+    return ["en_attente", "pending", "pending_validation"].includes(st);
+  }).length;
+
   return (
     <div>
       <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 18, fontWeight: 700, letterSpacing: 2, marginBottom: 14 }}>
@@ -216,7 +221,7 @@ export default function AdminPartenairesPage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
         {[
           ["all", "Toutes"],
-          ["en_attente", "En attente"],
+          ["en_attente", `Demandes${nbDemandes ? ` (${nbDemandes})` : ""}`],
           ["valide", "Validées"],
           ["refuse", "Refusées"],
         ].map(([id, label]) => (
