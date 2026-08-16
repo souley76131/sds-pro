@@ -252,6 +252,7 @@ export default function MonCreditPage() {
   const st = dossier.statut_compte;
 
   if (st === "en_verification" || st === "en_attente_docs") {
+    const acompteMontant = (dossier.montant_1 || 0) + FRAIS_MDM;
     return (
       <main style={{ ...pageStyle, display: "block", maxWidth: 560, margin: "0 auto", paddingTop: 100 }}>
         <div style={cardStyle}>
@@ -271,9 +272,38 @@ export default function MonCreditPage() {
             Dossier pour <strong style={{ color: "#fff" }}>{dossier.appareil || "—"}</strong>
             <br />
             Soumis le {new Date(dossier.created_at).toLocaleDateString("fr-FR")}.
-            <br />
-            Vous serez notifié dès validation.
           </p>
+
+          {dossier.paye_1 ? (
+            <p style={{ fontSize: 13, color: "#00e676", lineHeight: 1.7, marginTop: 12 }}>
+              ✅ Acompte réglé. Votre dossier est en attente de validation par notre équipe.
+            </p>
+          ) : (
+            <div style={{ marginTop: 16, textAlign: "left" }}>
+              <p style={{ color: "#ffb020", fontSize: 13, lineHeight: 1.7 }}>
+                Pour avancer, réglez d’abord l’acompte (50% + 10 000 F frais MDM). Une fois payé, notre équipe
+                pourra valider votre dossier.
+              </p>
+              <button
+                type="button"
+                onClick={() => payerVersement(1)}
+                style={{
+                  width: "100%",
+                  marginTop: 8,
+                  padding: 14,
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg,#0055ff,#00c8ff)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                💳 Payer l’acompte — {fmt(acompteMontant)} FCFA
+              </button>
+            </div>
+          )}
         </div>
         {ordersBlock}
       </main>
