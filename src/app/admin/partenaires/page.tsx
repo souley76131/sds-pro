@@ -42,9 +42,9 @@ function formatPrice(n: number) {
 
 function statusMeta(s?: string) {
   const v = (s || "en_attente").toLowerCase();
-  if (["valide", "validé", "approved", "actif", "active"].includes(v))
+  if (["valide", "validé", "validee", "validée", "approved", "actif", "active"].includes(v))
     return { label: "Validée", color: "#00e676" };
-  if (["refuse", "refusé", "rejected", "suspendu"].includes(v))
+  if (["refuse", "refusé", "refusee", "refusée", "rejected", "suspendu"].includes(v))
     return { label: "Refusée / Suspendue", color: "#ff4444" };
   return { label: "En attente", color: "#ff9100" };
 }
@@ -81,13 +81,13 @@ export default function AdminPartenairesPage() {
   }, []);
 
   async function setStatut(id: string, statut: string) {
-    const { error } = await supabase.from("boutiques").update({ statut, status: statut }).eq("id", id);
+    const { error } = await supabase.from("boutiques").update({ statut }).eq("id", id);
     if (error) {
       showToast("Erreur : " + error.message);
       return;
     }
     showToast(
-      statut === "valide" ? "✅ Boutique validée" : statut === "refuse" ? "❌ Boutique refusée" : "Statut mis à jour"
+      statut === "validee" ? "✅ Boutique validée" : statut === "refusee" ? "❌ Boutique refusée" : "Statut mis à jour"
     );
     load();
   }
@@ -169,9 +169,9 @@ export default function AdminPartenairesPage() {
 
   const filtered = rows.filter((b) => {
     const st = (b.statut || b.status || "en_attente").toLowerCase();
-    if (filter === "valide" && !["valide", "validé", "approved", "actif", "active"].includes(st)) return false;
+    if (filter === "valide" && !["valide", "validé", "validee", "validée", "approved", "actif", "active"].includes(st)) return false;
     if (filter === "en_attente" && !["en_attente", "pending", "pending_validation"].includes(st)) return false;
-    if (filter === "refuse" && !["refuse", "refusé", "rejected", "suspendu"].includes(st)) return false;
+    if (filter === "refuse" && !["refuse", "refusé", "refusee", "refusée", "rejected", "suspendu"].includes(st)) return false;
     if (!q.trim()) return true;
     const s = q.toLowerCase();
     return (
@@ -300,10 +300,10 @@ export default function AdminPartenairesPage() {
               <Btn onClick={() => openDetail(b)} color="#6ab0ff">
                 👁 Détail / CA
               </Btn>
-              <Btn onClick={() => setStatut(b.id, "valide")} color="#00e676">
+              <Btn onClick={() => setStatut(b.id, "validee")} color="#00e676">
                 ✅ Valider
               </Btn>
-              <Btn onClick={() => setStatut(b.id, "refuse")} color="#ff4444">
+              <Btn onClick={() => setStatut(b.id, "refusee")} color="#ff4444">
                 ❌ Refuser
               </Btn>
               {b.sds_verified ? (
