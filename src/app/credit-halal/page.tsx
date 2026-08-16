@@ -6,6 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 
 const FRAIS_MDM = 10000;
 const BACKEND = "https://sdsprotech-backend.pages.dev";
+// Boutique par défaut quand le client n'arrive pas via un lien boutique
+// (catalogue global) — le CA reste rattaché à SDS PRO plutôt que null.
+const SDS_PRO_BOUTIQUE_ID = "1a7c846f-f4a9-4d06-b07f-51474edab005";
 
 export default function CreditHalalPage() {
   const [user, setUser] = useState<any>(null);
@@ -156,9 +159,9 @@ export default function CreditHalalPage() {
           produit_id: Number(formProduit),
           prix_total: Number(produit.prix),
           boutique_id:
-            typeof window !== "undefined"
-              ? window.sessionStorage.getItem("sds_boutique_id") || boutiqueId || null
-              : boutiqueId || null,
+            (typeof window !== "undefined"
+              ? window.sessionStorage.getItem("sds_boutique_id") || boutiqueId
+              : boutiqueId) || SDS_PRO_BOUTIQUE_ID,
           doc_cni_recto: d1,
           doc_cni_verso: d2,
           doc_selfie: d3,

@@ -30,6 +30,9 @@ const ALLOWED_EMAIL = [
 const LIVRAISON = 10000;
 const CHARGEUR = 15000;
 const ICLOUD = 5000;
+// Boutique par défaut quand le client n'arrive pas via un lien boutique
+// (catalogue global) — le CA reste rattaché à SDS PRO plutôt que null.
+const SDS_PRO_BOUTIQUE_ID = "1a7c846f-f4a9-4d06-b07f-51474edab005";
 
 function isValidSenegalPhone(phone: string) {
   let d = (phone || "").replace(/\D/g, "");
@@ -291,7 +294,9 @@ export default function BuyFlow({ product, open, initialQty, onClose }: Props) {
           payment_url: null,
           chargeur_amount: charger ? CHARGEUR * qty : 0,
           icloud_amount: icloud ? ICLOUD * qty : 0,
-          boutique_id: typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null,
+          boutique_id:
+            (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null) ||
+            SDS_PRO_BOUTIQUE_ID,
           boutique_nom: typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_nom") : null,
           total_fallback: total(),
         }),

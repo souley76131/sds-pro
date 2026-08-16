@@ -9,6 +9,9 @@ import { getCart, clearCart, type CartItem } from "@/lib/cart";
 const LIVRAISON = 10000;
 const CHARGEUR = 15000;
 const ICLOUD = 5000;
+// Boutique par défaut quand le client n'arrive pas via un lien boutique
+// (catalogue global) — le CA reste rattaché à SDS PRO plutôt que null.
+const SDS_PRO_BOUTIQUE_ID = "1a7c846f-f4a9-4d06-b07f-51474edab005";
 
 const ALLOWED_EMAIL = [
   "gmail.com", "googlemail.com", "hotmail.com", "hotmail.fr",
@@ -251,7 +254,8 @@ export default function CheckoutPage() {
           commande_id,
           boutique_id:
             items[0]?.boutiqueId ||
-            (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null),
+            (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null) ||
+            SDS_PRO_BOUTIQUE_ID,
           boutique_nom:
             items[0]?.boutiqueNom ||
             (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_nom") : null),
