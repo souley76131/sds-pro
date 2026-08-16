@@ -171,6 +171,18 @@ export default function CataloguePage() {
           return;
         }
 
+        // Contexte boutique (même détection que l'effect ci-dessus, lu en synchrone
+        // ici pour éviter un flash "catalogue global" avant que l'état se mette à jour).
+        let boutiqueScope: string | null = null;
+        if (typeof window !== "undefined") {
+          const p = new URLSearchParams(window.location.search);
+          boutiqueScope =
+            p.get("boutique_id") ||
+            p.get("boutique") ||
+            window.sessionStorage.getItem("sds_boutique_id") ||
+            null;
+        }
+
         const supabase = createClient();
         const mapProduct = (p: any): Product => ({
           id: p.id,
@@ -188,12 +200,17 @@ export default function CataloguePage() {
           variantes: Array.isArray(p.variantes) ? p.variantes : [],
         });
 
-        const { data, error } = await supabase
+        let productsQuery = supabase
           .from("products")
           .select("*")
           .eq("visible", true)
-          .eq("moderation_status", "approved")
-          .order("id", { ascending: true });
+          .eq("moderation_status", "approved");
+
+        if (boutiqueScope) {
+          productsQuery = productsQuery.eq("boutique_id", boutiqueScope);
+        }
+
+        const { data, error } = await productsQuery.order("id", { ascending: true });
 
         if (error) {
           const { data: fallbackData, error: fallbackError } = await supabase

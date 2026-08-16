@@ -73,9 +73,11 @@ export default function Portail() {
   }, [query]);
 
   function ouvrirBoutique(b: Boutique) {
-    const key = b.slug || String(b.id);
+    // Le catalogue et la fiche boutique filtrent products/boutiques sur l'UUID
+    // (boutiques.id), pas sur le slug — on doit donc toujours propager l'id réel.
+    const key = String(b.id);
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem("sds_boutique_id", String(key));
+      window.sessionStorage.setItem("sds_boutique_id", key);
       if (b.nom) {
         window.sessionStorage.setItem("sds_boutique_nom", String(b.nom));
       }
