@@ -323,8 +323,9 @@ export default function ProductDetailPage() {
                   }}
                   style={{
                     width: "100%",
-                    maxWidth: 760,
-                    aspectRatio: "4 / 5",
+                    maxWidth: isMobile ? 760 : 620,
+                    height: isMobile ? "auto" : 420,
+                    aspectRatio: isMobile ? "4 / 5" : "16 / 10",
                     margin: "0 auto",
                     borderRadius: 16,
                     overflow: "hidden",
