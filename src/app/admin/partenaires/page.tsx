@@ -72,6 +72,11 @@ export default function AdminPartenairesPage() {
     setLoading(true);
     const { data, error } = await supabase.from("boutiques").select("*").order("created_at", { ascending: false });
     if (error) showToast("Erreur : " + error.message);
+    // DEBUG TEMPORAIRE — à retirer une fois le diagnostic RLS/filtre tranché
+    console.log(
+      "[admin/partenaires] boutiques reçues:",
+      (data || []).map((b: any) => ({ nom: b.nom || b.name, statut: b.statut, status: b.status }))
+    );
     setRows(data || []);
     setLoading(false);
   }
