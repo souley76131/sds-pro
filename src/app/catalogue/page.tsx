@@ -21,6 +21,8 @@ type Product = {
   categorie?: string | null;
   description?: string | null;
   variantes?: { stockage?: string; couleur?: string; prix?: number; image?: string }[];
+  boutiqueId?: string | null;
+  boutiqueNom?: string | null;
 };
 
 type BoutiqueMeta = {
@@ -198,11 +200,13 @@ export default function CataloguePage() {
           categorie: p.categorie || null,
           description: p.description || p.description_longue || null,
           variantes: Array.isArray(p.variantes) ? p.variantes : [],
+          boutiqueId: p.boutique_id || null,
+          boutiqueNom: p.boutiques?.nom || null,
         });
 
         let productsQuery = supabase
           .from("products")
-          .select("*")
+          .select("*, boutiques(nom)")
           .eq("visible", true)
           .eq("moderation_status", "approved");
 
@@ -322,7 +326,8 @@ export default function CataloguePage() {
       emoji: product.emoji,
       unitPrice: Number(product.price || 0),
       qty: 1,
-      boutiqueId: currentBoutiqueId,
+      boutiqueId: product.boutiqueId || currentBoutiqueId,
+      boutiqueNom: product.boutiqueNom || boutiqueMeta?.nom || null,
     });
     setCartFlash(`${product.name} ajouté au panier`);
     if (typeof window !== "undefined") {

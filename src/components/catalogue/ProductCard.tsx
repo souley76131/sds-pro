@@ -17,6 +17,7 @@ export type Product = {
   categorie?: string | null;
   description?: string | null;
   variantes?: { stockage?: string; couleur?: string; prix?: number; image?: string }[];
+  boutiqueNom?: string | null;
 };
 
 type Props = {
@@ -243,6 +244,21 @@ export default function ProductCard({ product, onOrder, onAddToCart }: Props) {
             WebkitBackdropFilter: "blur(2px)",
           }}
         >
+          {product.boutiqueNom && (
+            <div
+              style={{
+                fontSize: 10,
+                color: "#00c8ff",
+                fontFamily: "DM Mono, monospace",
+                letterSpacing: 1,
+                marginBottom: 2,
+                textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+              }}
+            >
+              🏪 {product.boutiqueNom}
+            </div>
+          )}
+
           <div
             style={{
               fontSize: 11,
