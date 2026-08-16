@@ -65,18 +65,20 @@ export default function AdminCommandesPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
+    // boutiques.name / boutique_name n'existent pas (seule "nom" existe) — un embed
+    // sur des colonnes inexistantes fait échouer TOUTE la requête (42703), et comme
+    // seul `data` était lu, l'échec était silencieux : la page affichait 0 commande.
+    const { data, error } = await supabase
       .from("orders")
       .select(`
         *,
         boutiques: boutique_id (
           id,
-          nom,
-          name,
-          boutique_name
+          nom
         )
       `)
       .order("created_at", { ascending: false });
+    if (error) showToast("Erreur : " + error.message);
     setOrders((data as Order[]) || []);
     setLoading(false);
   }

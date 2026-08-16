@@ -18,6 +18,8 @@ type Order = {
   created_at?: string;
   telephone?: string;
   phone?: string;
+  boutique_id?: string;
+  boutiques?: { nom?: string } | null;
 };
 
 function formatPrice(n: number) {
@@ -64,16 +66,20 @@ export default function MesCommandesPage() {
     setLoading(true);
     setError("");
     try {
+      // boutiques.nom est la seule colonne réelle (name/boutique_name n'existent pas —
+      // les inclure ferait échouer tout l'embed en 42703).
+      const withBoutique = "*, boutiques: boutique_id ( nom )";
+
       let { data, error: err } = await supabase
         .from("orders")
-        .select("*")
+        .select(withBoutique)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if ((!data || !data.length) && userEmail) {
         const res2 = await supabase
           .from("orders")
-          .select("*")
+          .select(withBoutique)
           .eq("user_email", userEmail)
           .order("created_at", { ascending: false });
         data = res2.data;
@@ -255,6 +261,11 @@ export default function MesCommandesPage() {
                     {o.commande_id || `#${o.id}`} · {date}
                   </div>
                   <div style={{ fontWeight: 700, marginTop: 4 }}>{titre}</div>
+                  {o.boutiques?.nom && (
+                    <div style={{ fontSize: 11, color: "#00c8ff", fontFamily: "DM Mono, monospace", marginTop: 2 }}>
+                      🏪 {o.boutiques.nom}
+                    </div>
+                  )}
                 </div>
                 <span
                   style={{

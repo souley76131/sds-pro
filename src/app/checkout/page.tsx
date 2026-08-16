@@ -199,6 +199,15 @@ export default function CheckoutPage() {
       setError("Email non accepté.");
       return;
     }
+    // La commande n'a qu'un seul boutique_id (items[0]) — un panier avec des
+    // articles de boutiques différentes attribuerait tout le CA à la 1ère.
+    const boutiqueIds = [...new Set(items.map((i) => i.boutiqueId).filter(Boolean))];
+    if (boutiqueIds.length > 1) {
+      setError(
+        "Votre panier contient des articles de plusieurs boutiques différentes. Videz le panier et commandez une boutique à la fois."
+      );
+      return;
+    }
 
     const articles = items
       .map((i) => {
