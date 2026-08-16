@@ -297,9 +297,6 @@ export default function Navbar() {
           Boutique
         </div>
 
-        <Link href="/catalogue" onClick={() => setDrawerOpen(false)} style={drawerLink}>
-          📱 Catalogue
-        </Link>
         <Link href="/mes-commandes" onClick={() => setDrawerOpen(false)} style={drawerLink}>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             📦 Mes commandes

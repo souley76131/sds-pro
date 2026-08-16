@@ -85,6 +85,29 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [cartFlash, setCartFlash] = useState("");
   const [boutiqueId, setBoutiqueId] = useState<string | null>(null);
+  const [fullscreenMedia, setFullscreenMedia] = useState<{ type: "image" | "video"; url: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth <= 768);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const gallery = useMemo(() => {
+    if (!product) return [] as { type: "image" | "video"; url: string }[];
+    const items: { type: "image" | "video"; url: string }[] = [];
+    if (product.images?.length) {
+      product.images.forEach((url) => {
+        if (url) items.push({ type: "image", url });
+      });
+    }
+    if (product.video_url) {
+      items.push({ type: "video", url: product.video_url });
+    }
+    return items;
+  }, [product]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -96,6 +119,14 @@ export default function ProductDetailPage() {
       window.sessionStorage.setItem("sds_boutique_id", boutique);
     }
   }, []);
+
+  useEffect(() => {
+    if (!product || !gallery.length) return;
+    const lastItem = gallery[gallery.length - 1];
+    if (lastItem?.type === "video") {
+      setGalleryIndex(gallery.length - 1);
+    }
+  }, [product, gallery]);
 
   useEffect(() => {
     const id = params?.id;
@@ -149,21 +180,73 @@ export default function ProductDetailPage() {
     void load();
   }, [params]);
 
-  const gallery = useMemo(() => {
-    if (!product) return [] as { type: "image" | "video"; url: string }[];
-    const items: { type: "image" | "video"; url: string }[] = [];
-    if (product.images?.length) {
-      product.images.forEach((url) => {
-        if (url) items.push({ type: "image", url });
-      });
-    }
-    if (product.video_url) {
-      items.push({ type: "video", url: product.video_url });
-    }
-    return items;
-  }, [product]);
-
   const mainMedia = gallery[galleryIndex] || gallery[0] || null;
+
+  function renderMedia(media: { type: "image" | "video"; url: string } | null, fullScreen = false) {
+    if (!media) {
+      return (
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(0,0,0,0.35)",
+            color: "#00c8ff",
+            fontSize: fullScreen ? 96 : 72,
+          }}
+        >
+          {product?.emoji || "📱"}
+        </div>
+      );
+    }
+
+    if (media.type === "video") {
+      return (
+        <div style={{ position: "relative", width: "100%", height: "100%" }}>
+          <video
+            src={media.url}
+            autoPlay
+            muted
+            loop
+            playsInline
+            controls
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: fullScreen ? "contain" : "cover",
+              display: "block",
+              background: "#000",
+            }}
+          />
+          {!fullScreen && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "linear-gradient(180deg, transparent 55%, rgba(0,0,0,0.35))",
+                pointerEvents: "none",
+              }}
+            />
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={media.url}
+        alt={product?.name || "Produit"}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: fullScreen ? "contain" : "cover",
+          display: "block",
+          background: "#000",
+        }}
+      />
+    );
+  }
 
   function changeQty(delta: number) {
     setQty((current) => Math.max(1, current + delta));
@@ -204,7 +287,7 @@ export default function ProductDetailPage() {
   }
 
   return (
-    <main style={{ minHeight: "100vh", padding: "110px 20px 60px", background: "#020912", color: "#fff" }}>
+    <main style={{ minHeight: "100vh", padding: isMobile ? "80px 12px 40px" : "110px 20px 60px", background: "#020912", color: "#fff" }}>
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ marginBottom: 24 }}>
           <Link href="/catalogue" style={{ color: "#00c8ff", textDecoration: "none", fontSize: 14 }}>
@@ -221,7 +304,7 @@ export default function ProductDetailPage() {
             <p style={{ color: "#7a9abb" }}>Produit introuvable.</p>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 0.9fr", gap: 28 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.7fr 0.9fr", gap: 28 }}>
             <section>
               <div
                 style={{
@@ -229,18 +312,21 @@ export default function ProductDetailPage() {
                   border: "1px solid rgba(0,160,255,0.12)",
                   overflow: "hidden",
                   marginBottom: 20,
+                  background: "rgba(7,18,32,0.75)",
                 }}
               >
                 <div
+                  onClick={() => setFullscreenMedia((current) => (current ? null : mainMedia))}
                   style={{
                     width: "100%",
-                    maxWidth: 560,
+                    maxWidth: 760,
                     aspectRatio: "4 / 5",
                     margin: "0 auto",
                     borderRadius: 16,
                     overflow: "hidden",
                     background: "#000",
                     position: "relative",
+                    cursor: "pointer",
                   }}
                 >
                   {mainMedia ? (
@@ -527,6 +613,56 @@ export default function ProductDetailPage() {
           </div>
         )}
       </div>
+
+      {fullscreenMedia && (
+        <div
+          onClick={() => setFullscreenMedia(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.94)",
+            zIndex: 2000,
+            display: "grid",
+            placeItems: "center",
+            padding: 16,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setFullscreenMedia(null)}
+            style={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              width: 42,
+              height: 42,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "rgba(255,255,255,0.08)",
+              color: "#fff",
+              fontSize: 22,
+              cursor: "pointer",
+              zIndex: 2,
+            }}
+          >
+            ×
+          </button>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              height: "100%",
+              maxWidth: 1500,
+              maxHeight: "92vh",
+              borderRadius: 20,
+              overflow: "hidden",
+              background: "#000",
+            }}
+          >
+            {renderMedia(fullscreenMedia, true)}
+          </div>
+        </div>
+      )}
 
       <BuyFlow product={product} open={buyOpen} initialQty={qty} onClose={() => setBuyOpen(false)} />
     </main>

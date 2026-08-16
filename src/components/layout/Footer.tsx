@@ -1,13 +1,27 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import LegalIds from "@/components/LegalIds";
 
 export default function Footer() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth <= 768);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
   return (
     <footer
       style={{
         background: "#000",
         borderTop: "1px solid rgba(0,180,255,0.22)",
-        padding: "56px 20px 36px",
+        padding: isMobile ? "32px 16px 24px" : "56px 20px 36px",
+        width: "100%",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -15,11 +29,14 @@ export default function Footer() {
           maxWidth: 1440,
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-          gap: 40,
-          marginBottom: 40,
-          paddingBottom: 40,
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))",
+          gap: isMobile ? 24 : 40,
+          marginBottom: isMobile ? 24 : 40,
+          paddingBottom: isMobile ? 20 : 40,
           borderBottom: "1px solid rgba(0,180,255,0.22)",
+          width: "100%",
+          boxSizing: "border-box",
+          overflow: "hidden",
         }}
       >
         {/* Brand */}
@@ -42,6 +59,8 @@ export default function Footer() {
               color: "#7a9abb",
               lineHeight: 1.7,
               maxWidth: 290,
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
             }}
           >
             <strong style={{ color: "#eaf7ff" }}>
@@ -138,12 +157,15 @@ export default function Footer() {
           maxWidth: 1440,
           margin: "0 auto",
           display: "flex",
+          flexDirection: isMobile ? "column" : "row",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: isMobile ? "flex-start" : "center",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 8,
           fontSize: 11,
           color: "#7a9abb",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       >
         <span>
