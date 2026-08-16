@@ -216,6 +216,15 @@ export default function BuyFlow({ product, open, initialQty, onClose }: Props) {
         prefillFromUser(data.user);
         setView("tunnel");
         setStep(1);
+
+        // Rattachement best-effort à la boutique d'origine — n'affecte pas le tunnel si ça échoue
+        const ctxBoutiqueId =
+          typeof window !== "undefined" ? window.sessionStorage.getItem("sds_boutique_id") : null;
+        if (ctxBoutiqueId) {
+          try {
+            await supabase.from("profiles").upsert({ id: data.user.id, boutique_id: ctxBoutiqueId });
+          } catch {}
+        }
       }
     } catch (e: any) {
       setError(/already|registered|exist/i.test(e.message) ? "Un compte existe déjà avec cet email." : e.message);

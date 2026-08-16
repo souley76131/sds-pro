@@ -101,7 +101,7 @@ export default function ConnexionPage() {
 
     setLoading(true);
     const supabase = createClient();
-    const { error: err } = await supabase.auth.signUp({
+    const { data, error: err } = await supabase.auth.signUp({
       email: emailOk,
       password,
       options: {
@@ -115,6 +115,16 @@ export default function ConnexionPage() {
         : "Erreur : " + err.message);
       return;
     }
+
+    // Rattachement best-effort à la boutique d'origine — n'affecte pas la redirection si ça échoue
+    const ctxBoutiqueId =
+      typeof window !== "undefined" ? window.sessionStorage.getItem("sds_boutique_id") : null;
+    if (ctxBoutiqueId && data.user) {
+      try {
+        await supabase.from("profiles").upsert({ id: data.user.id, boutique_id: ctxBoutiqueId });
+      } catch {}
+    }
+
     router.push(getRedirectTarget());
   }
 
