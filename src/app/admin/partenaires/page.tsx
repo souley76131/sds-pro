@@ -87,12 +87,24 @@ export default function AdminPartenairesPage() {
     load();
   }, []);
 
+  // Supabase renvoie error:null sur un UPDATE que RLS bloque entièrement (0 ligne
+  // matchée par la policy = pas une erreur SQL). Sans .select(), ce "succès" silencieux
+  // fait croire que l'action a marché alors que rien n'a changé en base.
+  function rlsBlocked(id: string, data: any[] | null) {
+    if (!data || data.length === 0) {
+      showToast("⚠️ Rien n'a été modifié (id " + id + ") — probablement bloqué par une policy RLS sur boutiques.");
+      return true;
+    }
+    return false;
+  }
+
   async function setStatut(id: string, statut: string) {
-    const { error } = await supabase.from("boutiques").update({ statut }).eq("id", id);
+    const { data, error } = await supabase.from("boutiques").update({ statut }).eq("id", id).select("id");
     if (error) {
       showToast("Erreur : " + error.message);
       return;
     }
+    if (rlsBlocked(id, data)) return;
     showToast(
       statut === "validee" ? "✅ Boutique validée" : statut === "refusee" ? "❌ Boutique refusée" : "Statut mis à jour"
     );
@@ -100,14 +112,16 @@ export default function AdminPartenairesPage() {
   }
 
   async function setVerified(id: string, value: boolean) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("boutiques")
       .update({ sds_verified: value, sds_verified_demande: false })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) {
       showToast("Erreur : " + error.message);
       return;
     }
+    if (rlsBlocked(id, data)) return;
     showToast(value ? "✓ SDS Verified accordé" : "SDS Verified retiré");
     load();
   }
@@ -117,18 +131,20 @@ export default function AdminPartenairesPage() {
     ouverture_statut: "ouverte" | "fermee" | "suspendue",
     message_public?: string | null
   ) {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("boutiques")
       .update({
         ouverture_statut,
         message_public: message_public?.trim() || null,
         ouverture_maj_at: new Date().toISOString(),
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) {
       showToast("Erreur : " + error.message);
       return;
     }
+    if (rlsBlocked(id, data)) return;
     showToast(
       ouverture_statut === "ouverte"
         ? "✅ Boutique ouverte"

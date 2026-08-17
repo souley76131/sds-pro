@@ -344,12 +344,18 @@ export default function EspacePartenairePage() {
       message_public = msg.trim() || null;
     }
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("boutiques")
       .update({ ouverture_statut: next, message_public, ouverture_maj_at: new Date().toISOString() })
-      .eq("id", boutique.id);
+      .eq("id", boutique.id)
+      .select("id");
     if (error) {
       setPubMsg("Erreur : " + error.message);
+      return;
+    }
+    // error:null + 0 ligne = RLS a bloqué l'update sans le signaler comme erreur SQL
+    if (!data || data.length === 0) {
+      setPubMsg("⚠️ Rien n'a été modifié — probablement bloqué par une policy RLS sur boutiques (UPDATE).");
       return;
     }
     setBoutique((b) => (b ? { ...b, ouverture_statut: next, message_public } : b));
