@@ -30,6 +30,10 @@ type Order = {
   has_charger?: boolean;
   livraison?: number;
   articles?: string;
+  livraison_confirmee?: boolean;
+  versement_statut?: string;
+  rembourse_at?: string;
+  montant_rembourse?: number;
   boutiques?: {
     id?: string | number;
     nom?: string;
@@ -52,6 +56,8 @@ function statusMeta(status?: string) {
     return { label: "Annulé", color: "#ff4444", bg: "rgba(255,68,68,0.15)", border: "rgba(255,68,68,0.3)" };
   if (["paye", "paid", "paie", "completed"].includes(s))
     return { label: "Payé", color: "#00e676", bg: "rgba(0,230,118,0.15)", border: "rgba(0,230,118,0.3)" };
+  if (["rembourse", "remboursé", "refunded"].includes(s))
+    return { label: "Remboursé", color: "#f87171", bg: "rgba(248,113,113,0.15)", border: "rgba(248,113,113,0.3)" };
   return { label: "En attente", color: "#ff9100", bg: "rgba(255,145,0,0.15)", border: "rgba(255,145,0,0.3)" };
 }
 
@@ -62,6 +68,7 @@ export default function AdminCommandesPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [actionLoading, setActionLoading] = useState<number | string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -93,13 +100,93 @@ export default function AdminCommandesPage() {
   }
 
   async function updateStatus(id: number | string, status: string) {
-    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
-    if (!error) {
-      showToast("Statut mis à jour ✅");
-      load();
-    } else {
+    // "livre" conditionne aussi livraison_confirmee : c'est ce champ (pas le texte
+    // du status) que /verser-boutique exige avant d'autoriser un versement partenaire.
+    const patch: Record<string, any> = { status };
+    if (status === "livre") patch.livraison_confirmee = true;
+    const { data, error } = await supabase.from("orders").update(patch).eq("id", id).select("id");
+    if (error) {
       showToast("Erreur : " + error.message);
+      return;
     }
+    if (!data || data.length === 0) {
+      showToast("⚠️ Rien n'a été modifié — probablement bloqué par une policy RLS sur orders.");
+      return;
+    }
+    showToast("Statut mis à jour ✅");
+    load();
+  }
+
+  async function getAccessToken(): Promise<string | null> {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token || null;
+  }
+
+  async function verserBoutique(o: Order) {
+    if (!o.boutique_id) {
+      showToast("⚠️ Cette commande n'est rattachée à aucune boutique.");
+      return;
+    }
+    if (!o.livraison_confirmee) {
+      showToast("⚠️ Confirmez d'abord la livraison (bouton Livré) avant de verser.");
+      return;
+    }
+    const montant = o.amount ?? o.prix ?? o.total ?? 0;
+    const ok = window.confirm(
+      `Confirmer le VERSEMENT à la boutique ?\n\nCommande : ${o.commande_id || o.id}\nMontant commande : ${formatPrice(
+        montant
+      )} FCFA (la commission SDS PRO sera déduite)\n\nCeci envoie réellement l'argent via PayDunya Disbursement vers le numéro mobile money de la boutique.`
+    );
+    if (!ok) return;
+
+    setActionLoading(o.id);
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error("Session admin expirée — reconnectez-vous.");
+      const res = await fetch("https://sdsprotech-backend.pages.dev/verser-boutique", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ order_id: o.id }),
+      });
+      const json: any = await res.json().catch(() => ({}));
+      if (!res.ok || json?.error) throw new Error(json.error || `Erreur (${res.status})`);
+      showToast(`✅ Versement envoyé (net ${formatPrice(json.net || 0)} FCFA)`);
+      load();
+    } catch (e: any) {
+      showToast("Erreur versement : " + (e.message || "action impossible"));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function marquerRembourse(o: Order) {
+    const montant = o.amount ?? o.prix ?? o.total ?? 0;
+    const ok = window.confirm(
+      `Confirmer le REMBOURSEMENT ?\n\nCommande : ${o.commande_id || o.id}\nMontant : ${formatPrice(
+        montant
+      )} FCFA\n\nCeci n'envoie PAS d'argent — c'est un enregistrement manuel. L'envoi réel (mobile money/cash) reste à faire vous-même.`
+    );
+    if (!ok) return;
+
+    const { data, error } = await supabase
+      .from("orders")
+      .update({
+        status: "rembourse",
+        rembourse_at: new Date().toISOString(),
+        montant_rembourse: montant,
+      })
+      .eq("id", o.id)
+      .select("id");
+    if (error) {
+      showToast("Erreur remboursement : " + error.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      showToast("⚠️ Rien n'a été modifié — probablement bloqué par une policy RLS sur orders.");
+      return;
+    }
+    showToast("Remboursement enregistré");
+    load();
   }
 
   function exportCSV() {
@@ -347,6 +434,38 @@ export default function AdminCommandesPage() {
                 💬 WhatsApp
               </button>
             </div>
+
+            {o.boutique_id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                {o.versement_statut !== "verse" && (
+                  <button
+                    type="button"
+                    disabled={actionLoading === o.id}
+                    onClick={() => verserBoutique(o)}
+                    style={{
+                      ...btn("linear-gradient(135deg,#00a86b,#00c864)", "#fff", "transparent"),
+                      opacity: actionLoading === o.id ? 0.6 : 1,
+                    }}
+                  >
+                    💰 {actionLoading === o.id ? "…" : "Verser à la boutique"}
+                  </button>
+                )}
+                {o.versement_statut === "verse" && (
+                  <span style={{ ...pill, color: "#00e676", borderColor: "rgba(0,230,118,0.3)" }}>
+                    ✅ Versé à la boutique
+                  </span>
+                )}
+                {(o.status || "").toLowerCase() !== "rembourse" && (
+                  <button
+                    type="button"
+                    onClick={() => marquerRembourse(o)}
+                    style={btn("rgba(248,113,113,0.15)", "#f87171", "rgba(248,113,113,0.3)")}
+                  >
+                    ↩️ Remboursement
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
