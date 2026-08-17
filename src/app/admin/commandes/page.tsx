@@ -34,6 +34,8 @@ type Order = {
   versement_statut?: string;
   rembourse_at?: string;
   montant_rembourse?: number;
+  paid_at?: string | null;
+  paye_at?: string | null;
   boutiques?: {
     id?: string | number;
     nom?: string;
@@ -65,6 +67,7 @@ export default function AdminCommandesPage() {
   const supabase = useMemo(() => createClient(), []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState("all");
+  const [filterBoutique, setFilterBoutique] = useState("all");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
@@ -219,9 +222,28 @@ export default function AdminCommandesPage() {
     showToast("✅ Export CSV téléchargé");
   }
 
+  // Boutiques présentes dans les commandes déjà chargées (pas de requête séparée)
+  const boutiquesOptions = (() => {
+    const map = new Map<string, string>();
+    orders.forEach((o) => {
+      if (o.boutique_id) map.set(String(o.boutique_id), o.boutiques?.nom || o.boutique_nom || String(o.boutique_id));
+    });
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  })();
+
   const filtered = orders.filter((o) => {
-    const status = (o.status || "en_attente").toLowerCase();
-    if (filter !== "all" && status !== filter) return false;
+    // "payees"/"remboursees" utilisent paid_at/rembourse_at, pas status : status se
+    // fait écraser par livre/en_cours/annule (voir updateStatus), donc un filtre
+    // status==="paye" manquerait toute commande déjà marquée livrée.
+    if (filter === "payees") {
+      if (!o.paid_at && !o.paye_at) return false;
+    } else if (filter === "remboursees") {
+      if (!o.rembourse_at) return false;
+    } else if (filter !== "all") {
+      const status = (o.status || "en_attente").toLowerCase();
+      if (status !== filter) return false;
+    }
+    if (filterBoutique !== "all" && String(o.boutique_id || "") !== filterBoutique) return false;
     if (!q.trim()) return true;
     const s = q.toLowerCase();
     return (
@@ -236,6 +258,8 @@ export default function AdminCommandesPage() {
     { id: "all", label: "Toutes" },
     { id: "en_attente", label: "En attente" },
     { id: "en_cours", label: "En cours" },
+    { id: "payees", label: "Payées" },
+    { id: "remboursees", label: "Remboursées" },
     { id: "livre", label: "Livrées" },
     { id: "annule", label: "Annulées" },
   ];
@@ -319,6 +343,27 @@ export default function AdminCommandesPage() {
             </button>
           ))}
         </div>
+        {boutiquesOptions.length > 0 && (
+          <select
+            value={filterBoutique}
+            onChange={(e) => setFilterBoutique(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,180,255,0.3)",
+              background: "#04101c",
+              color: "#fff",
+              fontSize: 12,
+            }}
+          >
+            <option value="all">Toutes les boutiques</option>
+            {boutiquesOptions.map(([id, nom]) => (
+              <option key={id} value={id}>
+                {nom}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={exportCSV}
@@ -338,6 +383,10 @@ export default function AdminCommandesPage() {
           ⬇️ Export CSV
         </button>
       </div>
+
+      {!loading && (
+        <p style={{ color: "#7a9abb", fontSize: 12, marginBottom: 10 }}>{filtered.length} commande(s)</p>
+      )}
 
       {loading && <div style={{ color: "#4a7a9b", textAlign: "center", padding: 30 }}>Chargement…</div>}
 

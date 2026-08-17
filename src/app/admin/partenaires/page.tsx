@@ -36,11 +36,25 @@ type Order = {
   produit?: string;
   product?: string;
   boutique_id?: string;
+  paid_at?: string | null;
+  paye_at?: string | null;
+  rembourse_at?: string | null;
+  montant_rembourse?: number | null;
 };
 
 function formatPrice(n: number) {
   return Number(n || 0).toLocaleString("fr-FR");
 }
+
+const caCardStyle: React.CSSProperties = {
+  padding: 14,
+  borderRadius: 12,
+  border: "1px solid rgba(0,180,255,0.22)",
+  background: "rgba(4,14,28,0.6)",
+};
+const caLabelStyle: React.CSSProperties = { fontSize: 11, color: "#7a9abb", letterSpacing: 1 };
+const caValueStyle: React.CSSProperties = { fontSize: 22, fontWeight: 700, marginTop: 4 };
+const caSubStyle: React.CSSProperties = { fontSize: 12, color: "#9eb6d0", marginTop: 4 };
 
 function statusMeta(s?: string) {
   const v = (s || "en_attente").toLowerCase();
@@ -233,7 +247,18 @@ export default function AdminPartenairesPage() {
     );
   });
 
-  const caBoutique = orders.reduce((s, o) => s + (o.prix || o.amount || o.total || 0), 0);
+  // CA basé sur paid_at (posé une seule fois par le webhook PayDunya au paiement),
+  // PAS sur status : "livre"/"en_cours"/"annule" écrasent status en cours de route
+  // (updateStatus fait un update({status}) brut), donc status seul sous-compterait
+  // toute commande déjà marquée livrée. paid_at, lui, n'est jamais réécrit ensuite.
+  const montantOf = (o: Order) => Number(o.prix || o.amount || o.total || 0);
+  const payees = orders.filter((o) => !!o.paid_at || !!o.paye_at);
+  const remboursees = orders.filter((o) => !!o.rembourse_at);
+  const enAttente = orders.filter((o) => !o.paid_at && !o.paye_at);
+  const caBrut = payees.reduce((s, o) => s + montantOf(o), 0);
+  const totalRembourse = remboursees.reduce((s, o) => s + Number(o.montant_rembourse ?? montantOf(o)), 0);
+  const caNet = caBrut - totalRembourse;
+  const pipeline = enAttente.reduce((s, o) => s + montantOf(o), 0);
 
   const nbDemandes = rows.filter((b) => {
     const st = (b.statut || b.status || "en_attente").toLowerCase();
@@ -496,21 +521,27 @@ export default function AdminPartenairesPage() {
             <Line k="Adresse" v={selected.adresse || selected.address || "—"} />
             <Line k="Statut" v={statusMeta(selected.statut || selected.status).label} />
 
-            <div
-              style={{
-                marginTop: 14,
-                marginBottom: 10,
-                padding: 12,
-                borderRadius: 12,
-                background: "rgba(0,200,255,0.08)",
-                border: "1px solid rgba(0,200,255,0.2)",
-              }}
-            >
-              <div style={{ fontSize: 10, color: "#4a7a9b", fontFamily: "DM Mono, monospace" }}>CA BOUTIQUE</div>
-              <div style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 24, fontWeight: 700, color: "#00e5ff" }}>
-                {formatPrice(caBoutique)} FCFA
+            <div style={{ display: "grid", gap: 10, marginTop: 14, marginBottom: 10 }}>
+              <div style={caCardStyle}>
+                <div style={caLabelStyle}>CA BRUT</div>
+                <div style={{ ...caValueStyle, color: "#00c8ff" }}>{formatPrice(caBrut)} FCFA</div>
+                <div style={caSubStyle}>{payees.length} commande(s) encaissée(s)</div>
               </div>
-              <div style={{ fontSize: 12, color: "#7a9abb" }}>{orders.length} commande(s)</div>
+              <div style={caCardStyle}>
+                <div style={caLabelStyle}>REMBOURSÉ</div>
+                <div style={{ ...caValueStyle, color: "#f87171" }}>− {formatPrice(totalRembourse)} FCFA</div>
+                <div style={caSubStyle}>{remboursees.length} remboursement(s)</div>
+              </div>
+              <div style={caCardStyle}>
+                <div style={caLabelStyle}>CA NET</div>
+                <div style={{ ...caValueStyle, color: "#00c864" }}>{formatPrice(caNet)} FCFA</div>
+                <div style={caSubStyle}>Brut − remboursé</div>
+              </div>
+              <div style={caCardStyle}>
+                <div style={caLabelStyle}>EN ATTENTE</div>
+                <div style={{ ...caValueStyle, color: "#ff9100" }}>{formatPrice(pipeline)} FCFA</div>
+                <div style={caSubStyle}>{enAttente.length} commande(s) non payée(s)</div>
+              </div>
             </div>
 
             <div style={{ marginTop: 18, marginBottom: 14, padding: 12, borderRadius: 12, background: "rgba(0,150,150,0.08)", border: "1px solid rgba(0,200,200,0.2)" }}>
