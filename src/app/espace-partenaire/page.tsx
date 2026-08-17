@@ -28,6 +28,8 @@ type Boutique = {
   hero_videos?: string[] | string | null;
   sds_verified?: boolean;
   sds_verified_demande?: boolean;
+  ouverture_statut?: "ouverte" | "fermee" | "suspendue" | null;
+  message_public?: string | null;
 };
 
 export default function EspacePartenairePage() {
@@ -117,7 +119,9 @@ export default function EspacePartenairePage() {
     }
     const { data: rows } = await supabase
       .from("boutiques")
-      .select("id,nom,slug,logo_url,proprietaire,ville,hero_videos,sds_verified,sds_verified_demande")
+      .select(
+        "id,nom,slug,logo_url,proprietaire,ville,hero_videos,sds_verified,sds_verified_demande,ouverture_statut,message_public"
+      )
       .eq("id", bid)
       .limit(1);
     setBoutique((rows && rows[0]) || { id: bid, nom: "Ma boutique" });
@@ -323,6 +327,33 @@ export default function EspacePartenairePage() {
     }
     setBoutique((b) => (b ? { ...b, sds_verified_demande: true } : b));
     setPubMsg("✓ Demande envoyée. SDS PRO vous contactera.");
+  }
+
+  async function toggleOuverture() {
+    if (!boutique?.id) return;
+    // Le partenaire ne peut basculer qu'entre ouverte/fermée — "suspendue" reste
+    // une action réservée à l'admin (litige, non-respect des règles, etc.).
+    const next = boutique.ouverture_statut === "fermee" ? "ouverte" : "fermee";
+    let message_public: string | null = null;
+    if (next === "fermee") {
+      const msg = window.prompt(
+        "Message affiché aux clients pendant la fermeture (facultatif)",
+        boutique.message_public || "Boutique temporairement fermée."
+      );
+      if (msg === null) return;
+      message_public = msg.trim() || null;
+    }
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("boutiques")
+      .update({ ouverture_statut: next, message_public, ouverture_maj_at: new Date().toISOString() })
+      .eq("id", boutique.id);
+    if (error) {
+      setPubMsg("Erreur : " + error.message);
+      return;
+    }
+    setBoutique((b) => (b ? { ...b, ouverture_statut: next, message_public } : b));
+    setPubMsg(next === "ouverte" ? "✓ Boutique ouverte" : "✓ Boutique fermée");
   }
 
   async function creerPubBoutique() {
@@ -1422,6 +1453,66 @@ export default function EspacePartenairePage() {
               </div>
               <div style={{ color: "#7a9abb", fontSize: 13 }}>Personnalisez le bandeau hero de votre boutique</div>
             </div>
+
+            {boutique?.ouverture_statut === "suspendue" ? (
+              <div
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  border: "1px solid rgba(248,113,113,0.35)",
+                  background: "rgba(248,113,113,0.06)",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ color: "#f87171", fontWeight: 700, marginBottom: 4 }}>⛔ Boutique suspendue</div>
+                <p style={{ color: "#c8dff5", fontSize: 13, margin: 0 }}>
+                  {boutique.message_public || "Contactez SDS PRO pour en savoir plus."} Seul SDS PRO peut lever une
+                  suspension.
+                </p>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  padding: 16,
+                  borderRadius: 12,
+                  border: "1px solid rgba(0,180,255,0.22)",
+                  marginBottom: 16,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700, color: boutique?.ouverture_statut === "fermee" ? "#ff9100" : "#00e676" }}>
+                    {boutique?.ouverture_statut === "fermee" ? "🚪 Boutique fermée" : "🔓 Boutique ouverte"}
+                  </div>
+                  {boutique?.ouverture_statut === "fermee" && boutique?.message_public && (
+                    <div style={{ color: "#7a9abb", fontSize: 12, marginTop: 2 }}>{boutique.message_public}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleOuverture}
+                  style={{
+                    padding: "9px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    background:
+                      boutique?.ouverture_statut === "fermee"
+                        ? "linear-gradient(135deg,#0055ff,#00c8ff)"
+                        : "rgba(255,145,0,0.15)",
+                    color: boutique?.ouverture_statut === "fermee" ? "#fff" : "#ff9100",
+                  }}
+                >
+                  {boutique?.ouverture_statut === "fermee" ? "Rouvrir la boutique" : "Fermer temporairement"}
+                </button>
+              </div>
+            )}
 
             {!boutique?.sds_verified ? (
               <div style={{ padding: 16, borderRadius: 12, border: "1px solid rgba(255,145,0,0.35)", background: "rgba(255,145,0,0.06)" }}>

@@ -221,6 +221,31 @@ export default function CheckoutPage() {
       return;
     }
 
+    const boutiqueId =
+      items[0]?.boutiqueId ||
+      (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null) ||
+      SDS_PRO_BOUTIQUE_ID;
+    const boutiqueNom =
+      items[0]?.boutiqueNom ||
+      (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_nom") : null);
+
+    setLoading(true);
+    const { data: boutiqueEtat } = await supabase
+      .from("boutiques")
+      .select("ouverture_statut, message_public")
+      .eq("id", boutiqueId)
+      .maybeSingle();
+    if (boutiqueEtat?.ouverture_statut === "fermee" || boutiqueEtat?.ouverture_statut === "suspendue") {
+      setLoading(false);
+      setError(
+        boutiqueEtat.message_public ||
+          (boutiqueEtat.ouverture_statut === "suspendue"
+            ? "Cette boutique est suspendue et n'accepte pas de commandes pour le moment."
+            : "Cette boutique est fermée et n'accepte pas de commandes pour le moment.")
+      );
+      return;
+    }
+
     const articles = items
       .map((i) => {
         const extras = [
@@ -239,7 +264,6 @@ export default function CheckoutPage() {
     const commande_id =
       "CMD-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7).toUpperCase();
 
-    setLoading(true);
     try {
       const res = await fetch("https://sdsprotech-backend.pages.dev/paydunya-pay", {
         method: "POST",
@@ -252,13 +276,8 @@ export default function CheckoutPage() {
           user_id: user?.id || null,
           articles,
           commande_id,
-          boutique_id:
-            items[0]?.boutiqueId ||
-            (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_id") : null) ||
-            SDS_PRO_BOUTIQUE_ID,
-          boutique_nom:
-            items[0]?.boutiqueNom ||
-            (typeof window !== "undefined" ? sessionStorage.getItem("sds_boutique_nom") : null),
+          boutique_id: boutiqueId,
+          boutique_nom: boutiqueNom,
           has_icloud: items.some((i) => !!i.icloud),
           has_charger: items.some((i) => !!i.charger),
           livraison: LIVRAISON,

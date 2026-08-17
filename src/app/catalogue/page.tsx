@@ -31,6 +31,8 @@ type BoutiqueMeta = {
   telephone?: string;
   whatsapp?: string;
   heroVideos?: string[];
+  ouvertureStatut?: "ouverte" | "fermee" | "suspendue" | null;
+  messagePublic?: string | null;
 };
 
 const BRANDS = [
@@ -79,21 +81,22 @@ export default function CataloguePage() {
     const loadBoutiqueMeta = async () => {
       try {
         const supabase = createClient();
-        
-        // Load boutique info - try with hero_videos first, then fallback
+
+        // "name" n'existe pas sur boutiques (seule "nom" existe) — l'inclure faisait
+        // échouer TOUTE la requête (42703), donc la bannière boutique (nom, logo,
+        // tel, whatsapp, vidéos) ne s'affichait jamais sur un catalogue boutique-scopé.
         let boutique = null;
         let heroVidsData: string[] = [];
 
-        // First try to get all fields including hero_videos
         const { data, error } = await supabase
           .from("boutiques")
-          .select("id, nom, name, logo_url, telephone, whatsapp, hero_videos")
+          .select("id, nom, logo_url, telephone, whatsapp, hero_videos, ouverture_statut, message_public")
           .eq("id", currentBoutiqueId)
           .maybeSingle();
 
         if (data) {
           boutique = data;
-          
+
           // Parse hero_videos safely
           if (boutique.hero_videos) {
             if (typeof boutique.hero_videos === 'string') {
@@ -108,24 +111,26 @@ export default function CataloguePage() {
           }
         }
 
-        // If hero_videos column doesn't exist, fallback query without it
+        // Si hero_videos n'existe pas dans cet environnement, fallback sans cette colonne
         if (!data && error && error.message.includes('hero_videos')) {
           const { data: fallback } = await supabase
             .from("boutiques")
-            .select("id, nom, name, logo_url, telephone, whatsapp")
+            .select("id, nom, logo_url, telephone, whatsapp, ouverture_statut, message_public")
             .eq("id", currentBoutiqueId)
             .maybeSingle();
-          
+
           boutique = fallback;
         }
 
         if (boutique) {
           setBoutiqueMeta({
-            nom: boutique.nom || boutique.name || "Boutique",
+            nom: boutique.nom || "Boutique",
             logo: boutique.logo_url || undefined,
             telephone: boutique.telephone || undefined,
             whatsapp: boutique.whatsapp || undefined,
             heroVideos: heroVidsData.filter(Boolean),
+            ouvertureStatut: boutique.ouverture_statut || "ouverte",
+            messagePublic: boutique.message_public || null,
           });
         }
 
@@ -362,8 +367,37 @@ export default function CataloguePage() {
           </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {BRANDS.map((brand) => {
+        {currentBoutiqueId &&
+        boutiqueMeta &&
+        (boutiqueMeta.ouvertureStatut === "fermee" || boutiqueMeta.ouvertureStatut === "suspendue") ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "60px 20px",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 16,
+              background: "rgba(255,255,255,0.03)",
+            }}
+          >
+            <h1 style={{ fontFamily: "Rajdhani, sans-serif", fontSize: 24, marginBottom: 10 }}>
+              {boutiqueMeta.nom}
+            </h1>
+            <p
+              style={{
+                color: boutiqueMeta.ouvertureStatut === "suspendue" ? "#f87171" : "#ff9100",
+                fontWeight: 700,
+                marginBottom: 10,
+              }}
+            >
+              {boutiqueMeta.ouvertureStatut === "suspendue" ? "Boutique suspendue" : "Boutique fermée"}
+            </p>
+            <p style={{ color: "#c8dff5", maxWidth: 420, margin: "0 auto" }}>
+              {boutiqueMeta.messagePublic || "Cette boutique n'accepte pas de commandes pour le moment."}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {BRANDS.map((brand) => {
             const isOpen = openBrand === brand.id || openBrand === "all";
             const brandProducts = getProductsByBrand(brand.id);
 
@@ -480,7 +514,8 @@ export default function CataloguePage() {
               </div>
             );
           })}
-        </div>
+          </div>
+        )}
       </div>
 
       <div

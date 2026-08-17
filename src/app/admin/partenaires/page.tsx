@@ -21,6 +21,8 @@ type Boutique = {
   hero_videos?: string[] | string | null;
   sds_verified?: boolean;
   sds_verified_demande?: boolean;
+  ouverture_statut?: "ouverte" | "fermee" | "suspendue" | null;
+  message_public?: string | null;
 };
 
 type Order = {
@@ -107,6 +109,33 @@ export default function AdminPartenairesPage() {
       return;
     }
     showToast(value ? "✓ SDS Verified accordé" : "SDS Verified retiré");
+    load();
+  }
+
+  async function setOuverture(
+    id: string,
+    ouverture_statut: "ouverte" | "fermee" | "suspendue",
+    message_public?: string | null
+  ) {
+    const { error } = await supabase
+      .from("boutiques")
+      .update({
+        ouverture_statut,
+        message_public: message_public?.trim() || null,
+        ouverture_maj_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (error) {
+      showToast("Erreur : " + error.message);
+      return;
+    }
+    showToast(
+      ouverture_statut === "ouverte"
+        ? "✅ Boutique ouverte"
+        : ouverture_statut === "fermee"
+        ? "🚪 Boutique fermée"
+        : "⛔ Boutique suspendue"
+    );
     load();
   }
 
@@ -299,7 +328,18 @@ export default function AdminPartenairesPage() {
               {b.sds_verified_demande && !b.sds_verified && (
                 <span style={{ fontSize: 11, color: "#ff9100" }}>Demande en attente</span>
               )}
+              {b.ouverture_statut === "fermee" && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#ff9100" }}>🚪 Fermée</span>
+              )}
+              {b.ouverture_statut === "suspendue" && (
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#f87171" }}>⛔ Suspendue</span>
+              )}
             </div>
+            {b.message_public && (b.ouverture_statut === "fermee" || b.ouverture_statut === "suspendue") && (
+              <div style={{ fontSize: 12, color: "#7a9abb", marginBottom: 4, fontStyle: "italic" }}>
+                💬 {b.message_public}
+              </div>
+            )}
             <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📞 {tel}</div>
             {b.email && <div style={{ fontSize: 13, color: "#c8dff5", marginBottom: 2 }}>📧 {b.email}</div>}
             {(b.adresse || b.address) && (
@@ -341,6 +381,46 @@ export default function AdminPartenairesPage() {
                 </Btn>
               )}
             </div>
+
+            {(b.statut || b.status || "").toLowerCase() === "validee" && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                {b.ouverture_statut !== "ouverte" && (
+                  <Btn onClick={() => setOuverture(b.id, "ouverte")} color="#00e676">
+                    🔓 Ouvrir
+                  </Btn>
+                )}
+                {b.ouverture_statut !== "fermee" && (
+                  <Btn
+                    onClick={() => {
+                      const msg = window.prompt(
+                        "Message public (fermeture)",
+                        b.message_public || "Boutique temporairement fermée."
+                      );
+                      if (msg === null) return;
+                      setOuverture(b.id, "fermee", msg);
+                    }}
+                    color="#ff9100"
+                  >
+                    🚪 Fermer
+                  </Btn>
+                )}
+                {b.ouverture_statut !== "suspendue" && (
+                  <Btn
+                    onClick={() => {
+                      const msg = window.prompt(
+                        "Message public (suspension)",
+                        b.message_public || "Boutique suspendue par SDS PRO."
+                      );
+                      if (msg === null) return;
+                      setOuverture(b.id, "suspendue", msg);
+                    }}
+                    color="#f87171"
+                  >
+                    ⛔ Suspendre
+                  </Btn>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
