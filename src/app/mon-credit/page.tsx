@@ -274,7 +274,12 @@ export default function MonCreditPage() {
             Soumis le {new Date(dossier.created_at).toLocaleDateString("fr-FR")}.
           </p>
 
-          {dossier.paye_1 ? (
+          {st === "en_attente_docs" ? (
+            <p style={{ fontSize: 13, color: "#ffb020", lineHeight: 1.7, marginTop: 12 }}>
+              🔒 Vos documents sont en cours de vérification par notre équipe (jusqu&apos;à 48h). Le paiement de
+              l&apos;acompte sera disponible ici dès que vos documents seront validés — vous recevrez un email.
+            </p>
+          ) : dossier.paye_1 ? (
             <p style={{ fontSize: 13, color: "#00e676", lineHeight: 1.7, marginTop: 12 }}>
               ✅ Acompte réglé. Votre dossier est en attente de validation par notre équipe.
             </p>

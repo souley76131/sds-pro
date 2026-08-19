@@ -41,6 +41,7 @@ function statusMeta(s?: string) {
   if (v === "valide") return { label: "Validé", color: "#00e676" };
   if (v === "refuse" || v === "refusé") return { label: "Refusé", color: "#ff4444" };
   if (v === "livre" || v === "livré") return { label: "Livré", color: "#00e5ff" };
+  if (v === "en_attente_docs") return { label: "🔒 Docs à valider", color: "#f87171" };
   return { label: "En vérification", color: "#ff9100" };
 }
 
@@ -167,7 +168,7 @@ export default function AdminCreditPage() {
   // actually touching SimpleMDM, which is the bug this fixes.
   async function adminAction(
     dossier_id: string,
-    action: "valider" | "refuser" | "verrouiller" | "deverrouiller"
+    action: "valider" | "refuser" | "verrouiller" | "deverrouiller" | "debloquer_paiement"
   ) {
     let device_id: string | undefined;
     let motif: string | undefined;
@@ -186,6 +187,13 @@ export default function AdminCreditPage() {
 
     if (action === "refuser") {
       motif = window.prompt("Motif du refus (optionnel) :") || undefined;
+    }
+
+    if (action === "debloquer_paiement") {
+      const ok = window.confirm(
+        "Confirmer que les documents sont valides ?\n\nLe client pourra alors payer l'acompte — aucun device_id n'est requis à cette étape."
+      );
+      if (!ok) return;
     }
 
     setActionLoading(true);
@@ -214,7 +222,9 @@ export default function AdminCreditPage() {
           ? "❌ Dossier refusé"
           : action === "verrouiller"
           ? "🔒 Appareil verrouillé"
-          : "🔓 Appareil déverrouillé"
+          : action === "deverrouiller"
+          ? "🔓 Appareil déverrouillé"
+          : "🔓 Paiement débloqué — email envoyé au client"
       );
       setSelected(null);
       load();
@@ -286,6 +296,7 @@ export default function AdminCreditPage() {
       <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
         {[
           ["all", "Tous"],
+          ["en_attente_docs", "🔒 Docs à valider"],
           ["en_verification", "En vérif."],
           ["valide", "Validés"],
           ["refuse", "Refusés"],
@@ -360,6 +371,11 @@ export default function AdminCreditPage() {
             </div>
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {d.statut_compte === "en_attente_docs" && (
+                <Btn onClick={() => adminAction(d.dossier_id, "debloquer_paiement")} color="#00c8ff">
+                  🔓 Débloquer le paiement
+                </Btn>
+              )}
               <Btn onClick={() => openDetail(d)} color="#6ab0ff">
                 👁 Détail / Valider
               </Btn>
@@ -544,6 +560,15 @@ export default function AdminCreditPage() {
             </div>
 
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+              {selected.statut_compte === "en_attente_docs" && (
+                <Btn
+                  onClick={() => adminAction(selected.dossier_id, "debloquer_paiement")}
+                  color="#00c8ff"
+                  disabled={actionLoading}
+                >
+                  🔓 Débloquer le paiement (docs OK)
+                </Btn>
+              )}
               <Btn
                 onClick={() => adminAction(selected.dossier_id, "valider")}
                 color="#00e676"
