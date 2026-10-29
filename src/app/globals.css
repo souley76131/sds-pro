@@ -30,3 +30,10 @@ body {
 	overflow-x: hidden;
 	margin: 0;
 }
+
+/* Onglets des rayons du catalogue : sans icône sur les petits téléphones */
+@media (max-width: 400px) {
+	.rayon-emoji {
+		display: none;
+	}
+}

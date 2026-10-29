@@ -17,6 +17,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 0.9,
     },
+    ...["ordinateurs", "accessoires"].map((rayon) => ({
+      url: `${baseUrl}/${rayon}`,
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    })),
     {
       url: `${baseUrl}/credit-halal`,
       lastModified: now,

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { RAYONS, rayonDuProduit, type Rayon } from "@/lib/rayons";
 
 const CONDITIONS_PARTENAIRE = `CONDITIONS PARTENAIRE SDS PRO
 
@@ -30,6 +31,13 @@ type Boutique = {
   sds_verified_demande?: boolean;
   ouverture_statut?: "ouverte" | "fermee" | "suspendue" | null;
   message_public?: string | null;
+};
+
+// Marques proposées dans le formulaire produit, selon le rayon choisi.
+const MARQUES_FORMULAIRE: Record<Rayon, [string, string][]> = {
+  telephones: [["Apple", "Apple / iPhone"], ["Samsung", "Samsung"], ["Infinix", "Infinix"], ["Tecno", "Tecno"], ["Huawei", "Huawei"], ["Xiaomi", "Xiaomi"], ["Autre", "Autre"]],
+  ordinateurs: [["Apple", "Apple / MacBook"], ["HP", "HP"], ["Dell", "Dell"], ["Lenovo", "Lenovo"], ["Asus", "Asus"], ["Acer", "Acer"], ["Autre", "Autre"]],
+  accessoires: [["Apple", "Apple"], ["Samsung", "Samsung"], ["Oraimo", "Oraimo"], ["JBL", "JBL"], ["Anker", "Anker"], ["Autre", "Autre"]],
 };
 
 export default function EspacePartenairePage() {
@@ -89,6 +97,7 @@ export default function EspacePartenairePage() {
   const [pModele, setPModele] = useState("");
   const [pPrix, setPPrix] = useState("");
   const [pEmoji, setPEmoji] = useState("📱");
+  const [pRayon, setPRayon] = useState<Rayon>("telephones");
   const [pMarque, setPMarque] = useState("");
   const [pEtat, setPEtat] = useState("");
   const [pSpecs, setPSpecs] = useState("");
@@ -633,6 +642,7 @@ export default function EspacePartenairePage() {
     setPModele("");
     setPPrix("");
     setPEmoji("📱");
+    setPRayon("telephones");
     setPMarque("");
     setPEtat("");
     setPSpecs("");
@@ -651,6 +661,7 @@ export default function EspacePartenairePage() {
     setPModele(p.modele || "");
     setPPrix(String(p.prix || ""));
     setPEmoji(p.emoji || "📱");
+    setPRayon(rayonDuProduit({ categorie: p.categorie, name: p.nom, model: p.modele }));
     setPMarque(p.marque || "");
     setPEtat(p.categorie?.includes("recond") ? "reconditionne" : "neuf");
     setPSpecs(Array.isArray(p.specs) ? p.specs.join(", ") : p.specs || "");
@@ -719,7 +730,9 @@ export default function EspacePartenairePage() {
     if (!boutique?.id) { setProdErr("Boutique introuvable."); return; }
 
     const FILTRE: Record<string, string> = { Apple: "iphone", Samsung: "samsung", Infinix: "infinix", Tecno: "tecno", Huawei: "huawei", Xiaomi: "xiaomi", Autre: "autre" };
-    const categorie = (FILTRE[pMarque] || pMarque.toLowerCase()) + " " + pEtat;
+    // Téléphones : ancien format (« iphone neuf ») ; autres rayons préfixés (« ordinateur hp neuf »).
+    const marqueCat = pRayon === "telephones" ? FILTRE[pMarque] || pMarque.toLowerCase() : pMarque.toLowerCase();
+    const categorie = [RAYONS[pRayon].prefixe, marqueCat, pEtat].filter(Boolean).join(" ");
 
     setProdSaving(true);
     try {
@@ -1115,16 +1128,31 @@ export default function EspacePartenairePage() {
                   <Field label="Modèle"><input value={pModele} onChange={(e) => setPModele(e.target.value)} style={inputStyle} /></Field>
                   <Field label="Prix (FCFA) *"><input type="number" value={pPrix} onChange={(e) => setPPrix(e.target.value)} style={inputStyle} /></Field>
                   <Field label="Emoji"><input value={pEmoji} onChange={(e) => setPEmoji(e.target.value)} style={inputStyle} maxLength={4} /></Field>
+                  <Field label="Rayon *">
+                    <select
+                      value={pRayon}
+                      onChange={(e) => {
+                        const r = e.target.value as Rayon;
+                        setPRayon(r);
+                        if (!MARQUES_FORMULAIRE[r].some(([v]) => v === pMarque)) setPMarque("");
+                        if (Object.values(RAYONS).some((x) => x.emoji === pEmoji)) setPEmoji(RAYONS[r].emoji);
+                      }}
+                      style={inputStyle}
+                    >
+                      {(Object.keys(RAYONS) as Rayon[]).map((r) => (
+                        <option key={r} value={r}>
+                          {RAYONS[r].emoji} {RAYONS[r].titre}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
                   <Field label="Marque *">
                     <select value={pMarque} onChange={(e) => setPMarque(e.target.value)} style={inputStyle}>
                       <option value="">— Choisir —</option>
-                      <option value="Apple">Apple / iPhone</option>
-                      <option value="Samsung">Samsung</option>
-                      <option value="Infinix">Infinix</option>
-                      <option value="Tecno">Tecno</option>
-                      <option value="Huawei">Huawei</option>
-                      <option value="Xiaomi">Xiaomi</option>
-                      <option value="Autre">Autre</option>
+                      {MARQUES_FORMULAIRE[pRayon].map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                      {pMarque && !MARQUES_FORMULAIRE[pRayon].some(([v]) => v === pMarque) ? <option value={pMarque}>{pMarque}</option> : null}
                     </select>
                   </Field>
                   <Field label="État *">

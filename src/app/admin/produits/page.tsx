@@ -30,6 +30,10 @@ function formatPrice(n: number) {
   return Number(n || 0).toLocaleString("fr-FR");
 }
 
+// Valeurs du menu « catégorie » ; une catégorie venue de l'espace partenaire
+// (« ordinateur hp neuf »…) reste affichée telle quelle.
+const CATEGORIES_ADMIN = ["Iphone neuf", "iphone recond", "samsung", "infinix", "tecno", "ordinateur neuf", "ordinateur recond", "accessoire neuf"];
+
 export default function AdminProduitsPage() {
   const supabase = useMemo(() => createClient(), []);
   const [products, setProducts] = useState<Product[]>([]);
@@ -500,6 +504,10 @@ export default function AdminProduitsPage() {
                 <option value="samsung">Samsung</option>
                 <option value="infinix">Infinix</option>
                 <option value="tecno">Tecno</option>
+                <option value="ordinateur neuf">💻 Ordinateur neuf</option>
+                <option value="ordinateur recond">💻 Ordinateur reconditionné</option>
+                <option value="accessoire neuf">🎧 Accessoire</option>
+                {categorie && !CATEGORIES_ADMIN.includes(categorie) ? <option value={categorie}>{categorie}</option> : null}
               </select>
             </div>
             <input style={input} placeholder="Badge (NOUVEAU / PROMO)" value={badge} onChange={(e) => setBadge(e.target.value)} />
